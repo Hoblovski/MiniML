@@ -1,13 +1,16 @@
 ANTLR_JAR ?= /usr/local/lib/antlr-4.8-complete.jar
 i ?= i.ml
-o ?= o.s
-
-LANGNAME=MiniML
-RUNMD = python3 -m src $(EXTRA_ARGS)
+o ?=
+e ?= -s c
+LANGNAME = MiniML
+RUNCMD = python3 -m src $(EXTRA_ARGS)
 
 CLASSPATH = $(ANTLR_JAR):generated
 
-all: cst
+all: run
+
+run: grammar-py
+	$(RUNCMD) $(i) $(o) $(e)
 
 cst: grammar-java
 	java -cp $(CLASSPATH) org.antlr.v4.gui.TestRig $(LANGNAME) top -gui $(i)
@@ -21,3 +24,6 @@ grammar-py:
 
 clean:
 	rm -rf generated src/generated
+	rm -rf **/__pycache__
+
+.PHONY: all clean run cst grammar-java grammar-py
