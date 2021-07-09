@@ -1,7 +1,7 @@
 ANTLR_JAR ?= /usr/local/lib/antlr-4.8-complete.jar
 i ?= i.ml
 o ?=
-e ?= -s c
+e ?= -bt -s a
 LANGNAME = MiniML
 RUNCMD = python3 -m src $(EXTRA_ARGS)
 

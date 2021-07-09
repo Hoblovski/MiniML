@@ -1,4 +1,5 @@
 from copy import deepcopy
+from antlr4 import *
 
 class MiniMLError(Exception):
     def __init__(self, *args, **kwargs):
@@ -18,4 +19,18 @@ def dumpLexerTokens(lexer):
     for token in lexer.getAllTokens():
         symName = symNames[token.type]
         print(f"{symName:<10} {token.text:<40}")
+
+def panic(msg):
+    print('================================')
+    print('==== PANIC =====================')
+    print(msg)
+    raise MiniMLError('compiler panicked')
+
+def text(x):
+    if isinstance(x, str):
+        return x
+    try:
+        return str(x.getText())
+    except AttributeError:
+        panic(f'invalid arg to text: {x}, type is {type(x)}')
 

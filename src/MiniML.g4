@@ -9,57 +9,56 @@ expr
     ;
 
 let
-    : lam # let0
+    : lam                                      # let0
     | 'let' Ident (':' ty)? '=' expr 'in' expr # let1    // by default recursive
     ;
 
 lam
-    : seq # lam0
-    | '\\' Ident ':' ty '->' expr  # lam1
+    : seq                                      # lam0
+    | '\\' Ident ':' ty '->' expr              # lam1
     ;
 
 seq
-    : rel   # seq0
-    | rel ';' seq                # seq1
+    : rel (';' rel)*
     ;
 
 rel
-    : add # rel0
-    | rel op=RelOp add # rel1
+    : add                                      # rel0
+    | rel RelOp add                            # rel1
     ;
 
 add
-    : mul # add0
-    | add op=AddOp mul # add1
+    : mul                                      # add0
+    | add AddOp mul                            # add1
     ;
 
 mul
-    : una # mul0
-    | mul op=MulOp una # mul1
+    : una                                      # mul0
+    | mul MulOp una                            # mul1
     ;
 
 una
-    : app # una0
-    | op=UnaOp una # una1
+    : app                                      # una0
+    | UnaOp una                                # una1
     ;
 
 app
-    : atom # app0
-    | app atom # app1
+    : atom                                     # app0
+    | app atom                                 # app1
     ;
 
 atom
-    : '(' ')' # atomUnit
-    | Integer # atomInt
-    | Ident # atomIdent
-    | '(' expr ')' # atomParen
-    | 'println' # atomPrint
+    : '(' ')'                                  # atomUnit
+    | Integer                                  # atomInt
+    | Ident                                    # atomIdent
+    | '(' expr ')'                             # atomParen
+    | 'println'                                # atomPrint
     ;
 
 ty
-    : 'unit'
-    | 'int'
-    | <assoc=right> ty '->' ty
+    : 'unit'                                   # tyUnit
+    | 'int'                                    # tyInt
+    | <assoc=right> ty '->' ty                 # tyArrow
     ;
 
 MulOp : '*' | '/' | '%' ;

@@ -5,7 +5,7 @@ from antlr4 import *
 from .utils import *
 from .generated.MiniMLLexer import MiniMLLexer
 from .generated.MiniMLParser import MiniMLParser
-
+from .frontend.ast import ConstructASTVisitor
 
 def doParseArgs(argv):
     parser = argparse.ArgumentParser(description='MiniML compiler')
@@ -16,8 +16,11 @@ def doParseArgs(argv):
             'outfile', default=sys.stdout, type=argparse.FileType('w'), nargs='?',
             help='output file, default is sysout')
     parser.add_argument(
-            '-s', '--stage', type=str, choices={'l', 'c'},
-            help='print debug info for that stage (lex, cst)')
+            '-s', '--stage', type=str, choices={'l', 'c', 'a'},
+            help='[Debug] print debug info for that stage (lex, cst)')
+    parser.add_argument(
+            '-bt', '--backtrace', action='store_true',
+            help='[Debug] print backtrace within compiler on any error')
     args = parser.parse_args()
     return args
 
@@ -48,7 +51,11 @@ def doParse(tokenStream):
 
 
 def doConstructAST(cst):
-    pass
+    ast = ConstructASTVisitor().visit(cst)
+    if args.stage == 'a':
+        print(ast)
+        exit(0)
+    return ast
 
 
 def main(argv):
@@ -58,6 +65,7 @@ def main(argv):
         inputs = FileStream(args.infile)
         tokens = doLex(inputs)
         cst = doParse(tokens)
+        ast = doConstructAST(cst)
         return 0
     except MiniMLError as e:
         if args.backtrace:
