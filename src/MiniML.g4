@@ -19,7 +19,12 @@ lam
     ;
 
 seq
-    : rel (';' rel)*
+    : ite (';' ite)*
+    ;
+
+ite
+    : rel                                      # ite0
+    | 'if' rel 'then' rel 'else' ite           # ite1
     ;
 
 rel
@@ -77,6 +82,8 @@ Whitespace
 Ident
     : IdentLead WordChar*
     ;
+
+Comment  : '--' (~[\r\n])* -> skip;
 
 fragment IdentLead: [a-zA-Z_];
 fragment WordChar: [0-9a-zA-Z_];

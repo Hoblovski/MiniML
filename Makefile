@@ -1,7 +1,7 @@
 ANTLR_JAR ?= /usr/local/lib/antlr-4.8-complete.jar
 i ?= i.ml
 o ?=
-e ?= -bt -s a
+e ?= -bt -s fmt
 LANGNAME = MiniML
 RUNCMD = python3 -m src $(EXTRA_ARGS)
 
@@ -24,6 +24,6 @@ grammar-py:
 
 clean:
 	rm -rf generated src/generated
-	rm -rf **/__pycache__
+	find . -name __pycache__ | xargs rm -rf
 
 .PHONY: all clean run cst grammar-java grammar-py

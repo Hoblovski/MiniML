@@ -50,6 +50,9 @@ class ASTVisitor:
         return res
 
     # For nodes without children, their `res` is [] (unless overriden)
+    # res is a list
+    #
+    # Used by the default `visit` to join results from `visitChildren`.
     def joinResults(self, res):
         return None
 
@@ -71,8 +74,10 @@ class ASTVisitor:
         print('Template function for visiting `XXXNode`')
         return None
 
+    def __call__(self, node):
+        return self.visit(node)
 
-# An example visitor
+# An @Example visitor
 class IndentedPrintVisitor(ASTVisitor):
     INDENT = '|   ' # indentation block
 
@@ -141,6 +146,11 @@ class BuiltinNode(ExprNode):
         super().__init__(ctx, name)
         self.setFields(locals())
 
+class IteNode(ExprNode):
+    def __init__(self, ctx, cond, tr, fl):
+        super().__init__(ctx, cond, tr, fl)
+        self.setFields(locals())
+
 class BinOpNode(ExprNode):
     LegalOps = {
             '*', '/', '%',
@@ -165,6 +175,7 @@ class UnaOpNode(ExprNode):
 
 class TyNode(ASTNode):
     def __init__(self, ctx, base, rhs=None):
+        # base can be TyNode or str
         super().__init__(ctx, base, rhs)
         self.setFields(locals())
 
@@ -198,7 +209,12 @@ class ConstructASTVisitor(MiniMLVisitor):
 
     def visitSeq(self, ctx:MiniMLParser.SeqContext):
         return SeqNode(ctx,
-                subs=[x.accept(self) for x in ctx.rel()])
+                subs=[x.accept(self) for x in ctx.ite()])
+
+    def visitIte1(self, ctx:MiniMLParser.Rel1Context):
+        return IteNode(ctx,
+                cond=ctx.rel(0).accept(self), tr=ctx.rel(1).accept(self),
+                fl=ctx.ite().accept(self))
 
     def visitRel1(self, ctx:MiniMLParser.Rel1Context):
         return BinOpNode(ctx,
@@ -254,3 +270,80 @@ class ConstructASTVisitor(MiniMLVisitor):
         return TyNode(ctx,
                 base='unit')
 
+##############################################################################
+
+class FormattedPrintVisitor(ASTVisitor):
+    INDENT = '    '
+
+    def __init__(self):
+        self.level = 0 # indentation level
+
+    def _i(self, s):
+        return '\n'.join([FormattedPrintVisitor.INDENT + l for l in s.split('\n')])
+
+    # @Example: hooking visit
+    def visit(self, node):
+        if isinstance(node, ASTNode):
+            return super().visit(node)
+        else:
+            return node
+
+    def joinResults(self, res):
+        if len(res) > 1:
+            return res
+        if len(res) == 1:
+            return res[0]
+        return ''
+
+    def visitTop(self, n):
+        res = '-- Program Begin --------------------------------\n'
+        res += self(n.expr)
+        res += '\n-- Program End --------------------------------'
+        return res
+
+    def visitLet(self, n):
+        return f'''let {self(n.name)} =
+{self._i(self(n.val))}
+in
+{self._i(self(n.body))}'''
+
+    def visitVarRef(self, n):
+        return f'{n.name}'
+
+    def visitLit(self, n):
+        return f'{n.val}'
+
+    def visitBuiltin(self, n):
+        return f'{n.name}'
+
+    def visitApp(self, n):
+        return f'({self(n.fn)} {self(n.arg)})'
+
+    def visitBinOp(self, n):
+        return f'({self(n.lhs)} {n.op} {self(n.rhs)})'
+
+    def visitUnaOp(self, n):
+        return f'({n.op} {self(n.sub)})'
+
+    def visitTy(self, n):
+        if n.rhs is None:
+            return f'{self(n.base)}'
+        else:
+            return f'{self(n.base)} -> {self(n.rhs)}'
+
+    def visitIte(self, n):
+        return f'''if {self(n.cond)} then
+{self._i(self(n.tr))}
+else
+{self._i(self(n.fl))}'''
+
+    def visitLam(self, n):
+        bodyStr = self(n.body)
+        res = f'\\{n.name} : {self(n.ty)} ->'
+        if len(bodyStr) < 40:
+            return f'{res} {bodyStr}'
+        else:
+            return f'{res}\n{self._i(bodyStr)}'
+
+    def visitSeq(self, n):
+        return ' ;\n'.join(self.visitChildren(n))
