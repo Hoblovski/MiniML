@@ -272,6 +272,7 @@ class ConstructASTVisitor(MiniMLVisitor):
 
 ##############################################################################
 
+# Yet another @Example visitor
 class FormattedPrintVisitor(ASTVisitor):
     INDENT = '    '
 

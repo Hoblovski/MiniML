@@ -9,6 +9,9 @@ CLASSPATH = $(ANTLR_JAR):generated
 
 all: run
 
+help: grammar-py
+	$(RUNCMD) --help
+
 run: grammar-py
 	$(RUNCMD) $(i) $(o) $(e)
 
@@ -26,4 +29,4 @@ clean:
 	rm -rf generated src/generated
 	find . -name __pycache__ | xargs rm -rf
 
-.PHONY: all clean run cst grammar-java grammar-py
+.PHONY: all clean run cst grammar-java grammar-py help
