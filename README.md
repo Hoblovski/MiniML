@@ -22,8 +22,12 @@ make help
 make i=testcases/fact.ml e='-s fmt'
 ```
 
+# Architecture
+* MiniML -> lambda calculus -> stackIR
+
 # Reference
 * [CompFun](http://www.cse.chalmers.se/edu/year/2011/course/CompFun/)
 * [CAS706](https://www.cas.mcmaster.ca/~carette/CAS706/2005/Compiling%20Functional%20Programming%20Languages.pdf)
 * [SoPL](https://xavierleroy.org/talks/compilation-agay.pdf)
 * Various compiler books (too many to name)
+* [scala phases](https://typelevel.org/scala/docs/phases.html)

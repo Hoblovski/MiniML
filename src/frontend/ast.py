@@ -4,6 +4,7 @@ custom fashion.
 """
 
 from ..utils import *
+from ..common import *
 from ..generated.MiniMLParser import MiniMLParser
 from ..generated.MiniMLVisitor import MiniMLVisitor
 
@@ -13,30 +14,36 @@ class ASTNode:
     The generic AST Node.
     Implements: location, __str__.
 
-    *Note: Subclass names must end with `Node`.
+    *NOTE: Subclass names must end with `Node`.
     """
 
-    def __init__(self, ctx, *chs):
-        self.chs = chs # a list of child nodes
-        self._ctx = ctx
+    # *NOTE: entries in chs must not be aliased (i.e. fields are lambdas eval'ed lazily)!!!
+    #        See `setAccessors`.
+    def __init__(self, chs, ctx=None, pos=None):
+        self.chs = chs
+        if pos is not None:
+            self.pos = pos
+        elif ctx is not None:
+            self.pos = ctxPos(ctx)
+        else:
+            self.pos = (-1, -1)
 
     def __str__(self):
         return IndentedPrintVisitor().visit(self)
 
+    def setChildren(self, *chs):
+        self.chs = chs
+
     def nodeName(self):
         name = self.__class__.__name__
-        assert name[-4:] == 'Node'
+        assert name.endswith('Node')
         return name[:-4]
 
-    def pos(self):
-        return (ctx.start.line,ctx.start.column)
-
-    def setFields(self, ld):
-        """Just quick start"""
-        for name in ld.keys() - {'self', 'ctx'}:
-            if name.startswith('_'):
-                continue
-            setattr(self, name, ld[name])
+    def setAccessors(self, *names):
+        """The name"""
+        assert len(names) == len(self.chs)
+        for index, name in enumerate(names):
+            setattr(self, name, lambda index=index: self.chs[index]) # fuck you python
 
 
 class ASTVisitor:
@@ -56,15 +63,25 @@ class ASTVisitor:
     def joinResults(self, res):
         return None
 
+    def visitorName(self):
+        name = self.__class__.__name__
+        assert name.endswith('Visitor')
+        return name[:-7]
+
     # Default: visit all children, return their `joinResults`
     # Override: simply define `visitXXX`
     #
     # Note that `node` may not necessarily be of type XXNode.
     # For example it could be a string.
+    #
+    # The default impl could be slow...
     def visit(self, node):
         if hasattr(self, f'visit{node.nodeName()}'):
             f = getattr(self, f'visit{node.nodeName()}')
             return f(node)
+        elif hasattr(node, f'accept{self.visitorName()}'):
+            f = getattr(node, f'accept{self.visitorName()}')
+            return f(self)
         else:
             res = self.visitChildren(node)
             return self.joinResults(res)
@@ -76,6 +93,31 @@ class ASTVisitor:
 
     def __call__(self, node):
         return self.visit(node)
+
+
+class ASTTransformer(ASTVisitor):
+    """
+    Simple transformer.
+
+    Return value of visitXXX is the new node (that replaces the old node).
+
+    Node deletion NOT SUPPORTED.
+    """
+    def visitChildren(self, node):
+        node.chs = [self.visit(ch) for ch in node.chs]
+
+    def joinResults(self, res):
+        raise MiniMLError('unreachable')
+
+    def visit(self, node):
+        """If visit method not overriden, return the old node -- unmodified."""
+        if hasattr(self, f'visit{node.nodeName()}'):
+            f = getattr(self, f'visit{node.nodeName()}')
+            return f(node)
+        else:
+            self.visitChildren(node)
+            return node
+
 
 # An @Example visitor
 class IndentedPrintVisitor(ASTVisitor):
@@ -100,86 +142,73 @@ class IndentedPrintVisitor(ASTVisitor):
 
 class TopNode(ASTNode):
     def __init__(self, ctx, expr):
-        super().__init__(ctx, expr)
-        self.setFields(locals())
+        super().__init__((expr,), ctx=ctx)
+        self.setAccessors('expr')
 
 class ExprNode(ASTNode):
-    def __init__(self, ctx, *chs):
-        super().__init__(ctx, *chs)
-
-class LetNode(ExprNode):
-    def __init__(self, ctx, name, val, body, ty=None):
-        super().__init__(ctx, name, val, body, ty)
-        self.setFields(locals())
+    def __init__(self, chs, ctx):
+        super().__init__(chs, ctx=ctx)
 
 class LamNode(ExprNode):
-    def __init__(self, ctx, name, ty, body):
-        super().__init__(ctx, name, ty, body)
-        self.setFields(locals())
+    def __init__(self, ctx, name:str, ty, body):
+        super().__init__((name, ty, body), ctx=ctx)
+        self.setAccessors('name', 'ty', 'body')
 
 class SeqNode(ExprNode):
     def __init__(self, ctx, subs):
-        super().__init__(ctx, *subs)
-        self.setFields(locals())
+        super().__init__(subs, ctx=ctx)
 
 class AppNode(ExprNode):
     def __init__(self, ctx, fn, arg):
-        super().__init__(ctx, fn, arg)
-        self.setFields(locals())
+        super().__init__((fn, arg), ctx=ctx)
+        self.setAccessors('fn', 'arg')
 
 class LitNode(ExprNode):
     def __init__(self, ctx, val):
-        super().__init__(ctx, val)
-        self.setFields(locals())
+        super().__init__((val,), ctx=ctx)
+        self.setAccessors('val')
 
 class VarRefNode(ExprNode):
     def __init__(self, ctx, name):
-        super().__init__(ctx, name)
-        self.setFields(locals())
+        super().__init__((name,), ctx=ctx)
+        self.setAccessors('name')
 
 class BuiltinNode(ExprNode):
-    LegalNames = {
-            'println',
-    }
     def __init__(self, ctx, name):
-        assert name in BuiltinNode.LegalNames
-        super().__init__(ctx, name)
-        self.setFields(locals())
+        assert name in AllBuiltins
+        super().__init__((name,), ctx=ctx)
+        self.setAccessors('name')
 
 class IteNode(ExprNode):
     def __init__(self, ctx, cond, tr, fl):
-        super().__init__(ctx, cond, tr, fl)
-        self.setFields(locals())
+        super().__init__((cond, tr, fl), ctx=ctx)
+        self.setAccessors('cond', 'tr', 'fl')
 
 class BinOpNode(ExprNode):
-    LegalOps = {
-            '*', '/', '%',
-            '+', '-',
-            '>', '<', '>=', '<=', '==', '!=',
-    }
-
     def __init__(self, ctx, lhs, op, rhs):
-        assert op in BinOpNode.LegalOps
-        super().__init__(ctx, lhs, op, rhs)
-        self.setFields(locals())
+        assert op in LegalBinOps
+        super().__init__((lhs, op, rhs), ctx=ctx)
+        self.setAccessors('lhs', 'op', 'rhs')
 
 class UnaOpNode(ExprNode):
-    LegalOps = {
-            '-',
-    }
-
     def __init__(self, ctx, op, sub):
-        assert op in UnaOpNode.LegalOps
-        super().__init__(ctx, name, ty, body)
-        self.setFields(locals())
+        assert op in LegalUnaOps
+        super().__init__((op, sub), ctx=ctx)
+        self.setAccessors('op', 'sub')
 
 class TyNode(ASTNode):
     def __init__(self, ctx, base, rhs=None):
         # base can be TyNode or str
-        super().__init__(ctx, base, rhs)
-        self.setFields(locals())
+        super().__init__((base, rhs), ctx=ctx)
+        self.setAccessors('base', 'rhs')
 
 ##############################################################################
+# Construct AST
+
+def _accept(ctx, visitor):
+    if ctx is None:
+        return None
+    return ctx.accept(visitor)
 
 class ConstructASTVisitor(MiniMLVisitor):
     """
@@ -194,22 +223,24 @@ class ConstructASTVisitor(MiniMLVisitor):
                 expr=ctx.expr().accept(self))
 
     def visitLet1(self, ctx:MiniMLParser.Let1Context):
-        if ctx.ty() is not None:
-            ty = ctx.ty().accept(self)
-        else:
-            ty = None
-        return LetNode(ctx,
-                name=text(ctx.Ident()), val=ctx.expr(0).accept(self),
-                body=ctx.expr(1).accept(self), ty=ty)
+        # Desugar: let X: T = E0 in E1  =>   (\\X:T -> E1)(E0)
+        return AppNode(ctx,
+                fn=LamNode(ctx,
+                    name=text(ctx.Ident()), ty=_accept(ctx.ty(), self),
+                    body=ctx.expr(1).accept(self)),
+                arg=ctx.expr(0).accept(self))
 
     def visitLam1(self, ctx:MiniMLParser.Lam1Context):
         return LamNode(ctx,
-                name=text(ctx.Ident()), ty=ctx.ty().accept(self),
+                name=text(ctx.Ident()), ty=_accept(ctx.ty(), self),
                 body=ctx.expr().accept(self))
 
     def visitSeq(self, ctx:MiniMLParser.SeqContext):
-        return SeqNode(ctx,
-                subs=[x.accept(self) for x in ctx.ite()])
+        subs=[x.accept(self) for x in ctx.ite()]
+        if len(subs) == 1:
+            return subs[0]
+        else:
+            return SeqNode(ctx, subs=subs)
 
     def visitIte1(self, ctx:MiniMLParser.Rel1Context):
         return IteNode(ctx,
@@ -287,7 +318,7 @@ class FormattedPrintVisitor(ASTVisitor):
         if isinstance(node, ASTNode):
             return super().visit(node)
         else:
-            return node
+            return str(node)
 
     def joinResults(self, res):
         if len(res) > 1:
@@ -298,53 +329,58 @@ class FormattedPrintVisitor(ASTVisitor):
 
     def visitTop(self, n):
         res = '-- Program Begin --------------------------------\n'
-        res += self(n.expr)
+        res += self(n.expr())
         res += '\n-- Program End --------------------------------'
         return res
 
-    def visitLet(self, n):
-        return f'''let {self(n.name)} =
-{self._i(self(n.val))}
-in
-{self._i(self(n.body))}'''
-
     def visitVarRef(self, n):
-        return f'{n.name}'
+        return f'{n.name()}'
 
     def visitLit(self, n):
-        return f'{n.val}'
+        return f'{n.val()}'
 
     def visitBuiltin(self, n):
-        return f'{n.name}'
+        return f'{n.name()}'
 
     def visitApp(self, n):
-        return f'({self(n.fn)} {self(n.arg)})'
+        if isinstance(n.fn(), LamNode) and DebugAllowSugarLetExpr:
+            return f'''let {self(n.fn.name())} : {self(n.fn.ty())} =
+{self._i(self(n.arg()))}
+in
+{self._i(self(n.fn.body()))}'''
+        else:
+            fn, arg = self(n.fn()), self(n.arg())
+            if len(arg) > 30:
+                return f'({fn}\n {arg})'
+            else:
+                return f'({fn} {arg})'
 
     def visitBinOp(self, n):
-        return f'({self(n.lhs)} {n.op} {self(n.rhs)})'
+        return f'({self(n.lhs())} {n.op()} {self(n.rhs())})'
 
     def visitUnaOp(self, n):
-        return f'({n.op} {self(n.sub)})'
+        return f'({n.op()} {self(n.sub())})'
 
     def visitTy(self, n):
-        if n.rhs is None:
-            return f'{self(n.base)}'
+        if n.rhs() is None:
+            return f'{self(n.base())}'
         else:
-            return f'{self(n.base)} -> {self(n.rhs)}'
+            return f'({self(n.base())} -> {self(n.rhs())})'
 
     def visitIte(self, n):
-        return f'''if {self(n.cond)} then
-{self._i(self(n.tr))}
+        return f'''if {self(n.cond())} then
+{self._i(self(n.tr()))}
 else
-{self._i(self(n.fl))}'''
+{self._i(self(n.fl()))}'''
 
     def visitLam(self, n):
-        bodyStr = self(n.body)
-        res = f'\\{n.name} : {self(n.ty)} ->'
+        bodyStr = self(n.body())
+        res = f'\\{n.name()} : {self(n.ty())} ->'
         if len(bodyStr) < 40:
-            return f'{res} {bodyStr}'
+            return f'({res} {bodyStr})'
         else:
-            return f'{res}\n{self._i(bodyStr)}'
+            return f'({res}\n{self._i(bodyStr)})'
 
     def visitSeq(self, n):
         return ' ;\n'.join(self.visitChildren(n))
+

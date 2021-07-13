@@ -10,12 +10,12 @@ expr
 
 let
     : lam                                      # let0
-    | 'let' Ident (':' ty)? '=' expr 'in' expr # let1    // by default recursive
+    | 'let' Ident (':' ty)? '=' expr 'in' expr    # let1    // by default recursive
     ;
 
 lam
     : seq                                      # lam0
-    | '\\' Ident ':' ty '->' expr              # lam1
+    | '\\' Ident (':' ty)? '->' expr              # lam1
     ;
 
 seq

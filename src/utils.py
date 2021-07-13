@@ -1,5 +1,8 @@
 from copy import deepcopy
 from antlr4 import *
+from ast import literal_eval
+
+DebugAllowSugarLetExpr = False
 
 class MiniMLError(Exception):
     def __init__(self, *args, **kwargs):
@@ -33,4 +36,7 @@ def text(x):
         return str(x.getText())
     except AttributeError:
         panic(f'invalid arg to text: {x}, type is {type(x)}')
+
+def ctxPos(ctx):
+    return (ctx.start.line,ctx.start.column)
 
