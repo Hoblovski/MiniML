@@ -10,7 +10,17 @@ expr
 
 let
     : lam                                      # let0
-    | 'let' Ident (':' ty)? '=' expr 'in' expr    # let1    // by default recursive
+    | 'letrec' letRecArms 'in' expr # let1
+    | 'let' Ident (':' ty)? '=' expr 'in' expr # let2
+    ;
+
+letRecArms
+    : letRecArm ('and' letRecArm)*
+    ;
+
+letRecArm
+    : Ident Ident '=' expr
+    | Ident '(' Ident ':' ty ')' '=' expr
     ;
 
 lam
@@ -63,6 +73,7 @@ atom
 ty
     : 'unit'                                   # tyUnit
     | 'int'                                    # tyInt
+    | '(' ty ')' # tyParen
     | <assoc=right> ty '->' ty                 # tyArrow
     ;
 

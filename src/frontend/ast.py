@@ -3,6 +3,8 @@ AST evolves and gets rewritten during compilation passe, defined thus in a
 custom fashion.
 """
 
+from collections import namedtuple
+
 from ..utils import *
 from ..common import *
 from ..generated.MiniMLParser import MiniMLParser
@@ -20,7 +22,7 @@ class ASTNode:
     # *NOTE: entries in chs must not be aliased (i.e. fields are lambdas eval'ed lazily)!!!
     #        See `setAccessors`.
     def __init__(self, chs, ctx=None, pos=None):
-        self.chs = chs
+        self.chs = list(chs) # for item assignment
         if pos is not None:
             self.pos = pos
         elif ctx is not None:
@@ -43,7 +45,12 @@ class ASTNode:
         """The name"""
         assert len(names) == len(self.chs)
         for index, name in enumerate(names):
-            setattr(self, name, lambda index=index: self.chs[index]) # fuck you python
+            def f(new=None, index=index): # fuck you python index=index
+                if new is None:
+                    return self.chs[index]
+                else:
+                    self.chs[index] = new
+            setattr(self, name, f)
 
 
 class ASTVisitor:
@@ -76,6 +83,9 @@ class ASTVisitor:
     #
     # The default impl could be slow...
     def visit(self, node):
+        if not isinstance(node, ASTNode):
+            return self.visitTerminalNode(node)
+
         if hasattr(self, f'visit{node.nodeName()}'):
             f = getattr(self, f'visit{node.nodeName()}')
             return f(node)
@@ -85,6 +95,9 @@ class ASTVisitor:
         else:
             res = self.visitChildren(node)
             return self.joinResults(res)
+
+    def visitTerminalNode(self, node):
+        pass
 
     # template:
     def visitXXX(self, node):
@@ -141,63 +154,69 @@ class IndentedPrintVisitor(ASTVisitor):
 # AST Nodes
 
 class TopNode(ASTNode):
-    def __init__(self, ctx, expr):
+    def __init__(self, ctx, expr:ExprNode):
         super().__init__((expr,), ctx=ctx)
         self.setAccessors('expr')
 
 class ExprNode(ASTNode):
-    def __init__(self, chs, ctx):
+    def __init__(self, chs:[ASTNode], ctx):
         super().__init__(chs, ctx=ctx)
 
 class LamNode(ExprNode):
-    def __init__(self, ctx, name:str, ty, body):
+    def __init__(self, ctx, name:str, ty:TyNode, body:ExprNode):
         super().__init__((name, ty, body), ctx=ctx)
         self.setAccessors('name', 'ty', 'body')
 
 class SeqNode(ExprNode):
-    def __init__(self, ctx, subs):
+    def __init__(self, ctx, subs:[ExprNode]):
         super().__init__(subs, ctx=ctx)
 
 class AppNode(ExprNode):
-    def __init__(self, ctx, fn, arg):
+    def __init__(self, ctx, fn:ExprNode, arg:ExprNode):
         super().__init__((fn, arg), ctx=ctx)
         self.setAccessors('fn', 'arg')
 
 class LitNode(ExprNode):
-    def __init__(self, ctx, val):
+    def __init__(self, ctx, val:int):
         super().__init__((val,), ctx=ctx)
         self.setAccessors('val')
 
 class VarRefNode(ExprNode):
-    def __init__(self, ctx, name):
+    def __init__(self, ctx, name:str):
         super().__init__((name,), ctx=ctx)
         self.setAccessors('name')
 
+LetRecArm = namedtuple('LetRecArm', ('name', 'arg', 'argTy', 'val'))
+class LetRecNode(ExprNode):
+    def __init__(self, ctx, arms:[LetRecArm], body:ExprNode):
+        super().__init__((arms, body), ctx=ctx)
+        self.setAccessors('arms', 'body')
+
 class BuiltinNode(ExprNode):
-    def __init__(self, ctx, name):
+    def __init__(self, ctx, name:str):
         assert name in AllBuiltins
         super().__init__((name,), ctx=ctx)
         self.setAccessors('name')
 
 class IteNode(ExprNode):
-    def __init__(self, ctx, cond, tr, fl):
+    def __init__(self, ctx, cond:ExprNode, tr:ExprNode, fl:ExprNode):
         super().__init__((cond, tr, fl), ctx=ctx)
         self.setAccessors('cond', 'tr', 'fl')
 
 class BinOpNode(ExprNode):
-    def __init__(self, ctx, lhs, op, rhs):
+    def __init__(self, ctx, lhs:ExprNode, op:str, rhs:ExprNode):
         assert op in LegalBinOps
         super().__init__((lhs, op, rhs), ctx=ctx)
         self.setAccessors('lhs', 'op', 'rhs')
 
 class UnaOpNode(ExprNode):
-    def __init__(self, ctx, op, sub):
+    def __init__(self, ctx, op:str, sub:ExprNode):
         assert op in LegalUnaOps
         super().__init__((op, sub), ctx=ctx)
         self.setAccessors('op', 'sub')
 
 class TyNode(ASTNode):
-    def __init__(self, ctx, base, rhs=None):
+    def __init__(self, ctx, base:TyNode, rhs:TyNode=None):
         # base can be TyNode or str
         super().__init__((base, rhs), ctx=ctx)
         self.setAccessors('base', 'rhs')
@@ -223,6 +242,19 @@ class ConstructASTVisitor(MiniMLVisitor):
                 expr=ctx.expr().accept(self))
 
     def visitLet1(self, ctx:MiniMLParser.Let1Context):
+        return LetRecNode(ctx,
+                arms=ctx.letRecArms().accept(self),
+                body=ctx.expr().accept(self))
+
+    def visitLetRecArms(self, ctx:MiniMLParser.LetRecArmsContext):
+        return [arm.accept(self) for arm in ctx.letRecArm()]
+
+    def visitLetRecArm(self, ctx:MiniMLParser.LetRecArmContext):
+        return LetRecArm(
+                name=text(ctx.Ident(0)), arg=text(ctx.Ident(1)),
+                argTy=_accept(ctx.ty(), self), val=ctx.expr().accept(self))
+
+    def visitLet2(self, ctx:MiniMLParser.Let2Context):
         # Desugar: let X: T = E0 in E1  =>   (\\X:T -> E1)(E0)
         return AppNode(ctx,
                 fn=LamNode(ctx,
@@ -285,6 +317,9 @@ class ConstructASTVisitor(MiniMLVisitor):
     def visitAtomParen(self, ctx:MiniMLParser.AtomParenContext):
         return ctx.expr().accept(self)
 
+    def visitTyParen(self, ctx:MiniMLParser.TyParenContext):
+        return ctx.ty().accept(self)
+
     def visitAtomPrint(self, ctx:MiniMLParser.AtomPrintContext):
         return BuiltinNode(ctx,
                 name='println')
@@ -343,17 +378,26 @@ class FormattedPrintVisitor(ASTVisitor):
         return f'{n.name()}'
 
     def visitApp(self, n):
-        if isinstance(n.fn(), LamNode) and DebugAllowSugarLetExpr:
-            return f'''let {self(n.fn.name())} : {self(n.fn.ty())} =
-{self._i(self(n.arg()))}
-in
-{self._i(self(n.fn.body()))}'''
+        fn, arg = self(n.fn()), self(n.arg())
+        if max(len(fn), len(arg)) > 30:
+            return f'({fn}\n {arg})'
         else:
-            fn, arg = self(n.fn()), self(n.arg())
-            if len(arg) > 30:
-                return f'({fn}\n {arg})'
-            else:
-                return f'({fn} {arg})'
+            return f'({fn} {arg})'
+
+    def visitLetRec(self, n):
+        armsStr = '\nand\n'.join(
+                self._i(f'{arm.name} ({arm.arg} : {self(arm.argTy)}) =\n{self._i(self(arm.val))}')
+                for arm in n.arms())
+        return f"""letrec
+{armsStr}
+in
+{self._i(self(n.body()))}"""
+
+        header += '   and '.join(
+                f'{arm.name} ({arm.arg} : {self(arm.argTy)}) = {self(arm.val)}' for arm in n.arms())
+        header += '\nin'
+        header += self._i(self(n.body()))
+        return header
 
     def visitBinOp(self, n):
         return f'({self(n.lhs())} {n.op()} {self(n.rhs())})'
@@ -376,7 +420,7 @@ else
     def visitLam(self, n):
         bodyStr = self(n.body())
         res = f'\\{n.name()} : {self(n.ty())} ->'
-        if len(bodyStr) < 40:
+        if len(bodyStr) < 40 and '\n' not in bodyStr:
             return f'({res} {bodyStr})'
         else:
             return f'({res}\n{self._i(bodyStr)})'
