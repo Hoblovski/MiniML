@@ -40,3 +40,31 @@ def text(x):
 def ctxPos(ctx):
     return (ctx.start.line,ctx.start.column)
 
+class stacked_dict:
+    def __init__(self):
+        self._s = [{}]
+        self._d = [{}]
+
+    def __getitem__(self, key):
+        return self._s[-1][key]
+
+    def __setitem__(self, key, value):
+        self._d[-1][key] = self._s[-1][key] = value
+
+    def __contains__(self, key):
+        return key in self._s[-1]
+
+    def __len__(self):
+        return len(self._s[-1])
+
+    def push(self):
+        self._s.append(deepcopy(self._s[-1]))
+        self._d.append({})
+
+    def pop(self):
+        assert len(self._s) > 1
+        self._s.pop()
+        self._d.pop()
+
+    def peek(self, last=0):
+        return self._d[-1-last]

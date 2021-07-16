@@ -5,8 +5,7 @@ from antlr4 import *
 from .utils import *
 from .generated.MiniMLLexer import MiniMLLexer
 from .generated.MiniMLParser import MiniMLParser
-from .frontend.ast import ConstructASTVisitor, FormattedPrintVisitor
-from .frontend.namer import Namer
+from .frontend import ConstructASTVisitor, FormattedPrintVisitor
 
 
 def printAst(ast):
@@ -71,7 +70,7 @@ def doConstructAST(cst):
 
 
 def doNamer(ast):
-    ast = Namer().visit(ast)
+    NamerVisitor().visit(ast)
     if args.stage == 'name':
         printAst(ast)
         exit(0)
