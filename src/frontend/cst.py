@@ -49,7 +49,7 @@ class ConstructASTVisitor(MiniMLVisitor):
 
     def visitSeq(self, ctx:MiniMLParser.SeqContext):
         subs=[x.accept(self) for x in ctx.ite()]
-        if len(subs) == 1:
+        if len(subs) == 1: # do not create unnecessary SeqNodes
             return subs[0]
         else:
             return SeqNode(ctx, subs=subs)
@@ -106,7 +106,7 @@ class ConstructASTVisitor(MiniMLVisitor):
 
     def visitTyInt(self, ctx:MiniMLParser.TyIntContext):
         return TyNode(ctx,
-                base='int')
+                base='int', rhs=None)
 
     def visitTyArrow(self, ctx:MiniMLParser.TyArrowContext):
         return TyNode(ctx,
@@ -114,5 +114,5 @@ class ConstructASTVisitor(MiniMLVisitor):
 
     def visitTyUnit(self, ctx:MiniMLParser.TyUnitContext):
         return TyNode(ctx,
-                base='unit')
+                base='unit', rhs=None)
 

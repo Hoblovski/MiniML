@@ -12,40 +12,25 @@ class ASTNode:
     Implements: location, __str__.
 
     *NOTE: Subclass names must end with `Node`.
+
+    @param bunched: Varargs node.
+        Always has fields of type `list` (not tuple etc!).
+        When flattened that field contains a list of ASTNodes.
+        Visitors shall treat them differently.
     """
 
-    # *NOTE: entries in chs must not be aliased (i.e. fields are lambdas eval'ed lazily)!!!
-    #        See `setAccessors`.
-    def __init__(self, chs, ctx=None, pos=None):
-        self.chs = list(chs) # for item assignment
-        if pos is not None:
-            self.pos = pos
-        elif ctx is not None:
-            self.pos = ctxPos(ctx)
-        else:
-            self.pos = (-1, -1)
+    def __init__(self, chs, pos=None, bunched=False):
+        self._c = list(chs) # Never alias these entries elsewhere.
+        self.pos = pos or (-1, -1)
+        self.bunched = bunched
 
     def __str__(self):
         return IndentedPrintVisitor().visit(self)
-
-    def setChildren(self, *chs):
-        self.chs = chs
 
     def nodeName(self):
         name = self.__class__.__name__
         assert name.endswith('Node')
         return name[:-4]
-
-    def setAccessors(self, *names):
-        """The name"""
-        assert len(names) == len(self.chs)
-        for index, name in enumerate(names):
-            def f(new=None, index=index): # fuck you python index=index
-                if new is None:
-                    return self.chs[index]
-                else:
-                    self.chs[index] = new
-            setattr(self, name, f)
 
 
 class ASTVisitor:
@@ -54,23 +39,27 @@ class ASTVisitor:
     """
     def visitChildren(self, node):
         res = []
-        for ch in node.chs:
-            res.append(self.visit(ch))
+        for ch in node._c:
+            if node.bunched and isinstance(ch, list):
+                res += [self(chch) for chch in ch]
+            else:
+                res += [self(ch)]
         return res
 
-    # For nodes without children, their `res` is [] (unless overriden)
-    # res is a list
-    #
-    # Used by the default `visit` to join results from `visitChildren`.
+    # Override me.
     def joinResults(self, res):
-        return None
+        pass
+
+    # Override me.
+    def visitTerminalNode(self, node):
+        pass
 
     def visitorName(self):
         name = self.__class__.__name__
         assert name.endswith('Visitor')
         return name[:-7]
 
-    # Default: visit all children, return their `joinResults`
+    # Default: `self.joinResults(self.visitorName(node))`
     # Override: simply define `visitXXX`
     #
     # Note that `node` may not necessarily be of type XXNode.
@@ -84,47 +73,20 @@ class ASTVisitor:
         if hasattr(self, f'visit{node.nodeName()}'):
             f = getattr(self, f'visit{node.nodeName()}')
             return f(node)
-        elif hasattr(node, f'accept{self.visitorName()}'):
+
+        if hasattr(node, f'accept{self.visitorName()}'):
             f = getattr(node, f'accept{self.visitorName()}')
             return f(self)
-        else:
-            res = self.visitChildren(node)
-            return self.joinResults(res)
 
-    def visitTerminalNode(self, node):
-        pass
+        if hasattr(node, f'accept'):
+            f = getattr(node, f'accept')
+            return f(self)
 
-    # template:
-    def visitXXX(self, node):
-        print('Template function for visiting `XXXNode`')
-        return None
+        res = self.visitChildren(node)
+        return self.joinResults(res)
 
     def __call__(self, node):
         return self.visit(node)
-
-
-class ASTTransformer(ASTVisitor):
-    """
-    Simple transformer.
-
-    Return value of visitXXX is the new node (that replaces the old node).
-
-    Node deletion NOT SUPPORTED.
-    """
-    def visitChildren(self, node):
-        node.chs = [self.visit(ch) for ch in node.chs]
-
-    def joinResults(self, res):
-        raise MiniMLError('unreachable')
-
-    def visit(self, node):
-        """If visit method not overriden, return the old node -- unmodified."""
-        if hasattr(self, f'visit{node.nodeName()}'):
-            f = getattr(self, f'visit{node.nodeName()}')
-            return f(node)
-        else:
-            self.visitChildren(node)
-            return node
 
 
 class IndentedPrintVisitor(ASTVisitor):
@@ -138,7 +100,11 @@ class IndentedPrintVisitor(ASTVisitor):
         if isinstance(node, ASTNode):
             result += node.nodeName() + '\n'
             self.level += 1
-            result += ''.join([self.visit(ch) for ch in node.chs])
+            for ch in node._c:
+                if node.bunched and isinstance(ch, list):
+                    result += ''.join(self(chch) for chch in ch)
+                else:
+                    result += self(ch)
             self.level -= 1
         else:
             result += str(node) + '\n'

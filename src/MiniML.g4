@@ -10,7 +10,7 @@ expr
 
 let
     : lam                                      # let0
-    | 'letrec' letRecArms 'in' expr # let1
+    | 'let rec' letRecArms 'in' expr # let1
     | 'let' Ident (':' ty)? '=' expr 'in' expr # let2
     ;
 

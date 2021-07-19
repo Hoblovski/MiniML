@@ -40,6 +40,15 @@ def text(x):
 def ctxPos(ctx):
     return (ctx.start.line,ctx.start.column)
 
+def flatten(l):
+    res = []
+    for i in l:
+        if isinstance(i, list):
+            res += flatten(i)
+        else:
+            res += [i]
+    return res
+
 class stacked_dict:
     def __init__(self):
         self._s = [{}]
