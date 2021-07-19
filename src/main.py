@@ -5,7 +5,7 @@ from antlr4 import *
 from .utils import *
 from .generated.MiniMLLexer import MiniMLLexer
 from .generated.MiniMLParser import MiniMLParser
-from .frontend import ConstructASTVisitor, FormattedPrintVisitor
+from .frontend import ConstructASTVisitor, FormattedPrintVisitor, NamerVisitor
 
 
 def printAst(ast):

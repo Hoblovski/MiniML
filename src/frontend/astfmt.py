@@ -1,5 +1,4 @@
 from .ast import ASTVisitor, ASTNode
-
 from ..utils import *
 from ..common import *
 
@@ -13,12 +12,8 @@ class FormattedPrintVisitor(ASTVisitor):
     def _i(self, s):
         return '\n'.join([FormattedPrintVisitor.INDENT + l for l in s.split('\n')])
 
-    # @Example: hooking visit
-    def visit(self, node):
-        if isinstance(node, ASTNode):
-            return super().visit(node)
-        else:
-            return str(node)
+    def visitTerminalNode(self, n):
+        return str(n)
 
     def joinResults(self, res):
         if len(res) > 1:
@@ -34,7 +29,8 @@ class FormattedPrintVisitor(ASTVisitor):
         return res
 
     def visitVarRef(self, n):
-        return f'{n.name()}'
+        name = n.name()
+        return name
 
     def visitLit(self, n):
         return f'{n.val()}'
@@ -50,19 +46,11 @@ class FormattedPrintVisitor(ASTVisitor):
             return f'({fn} {arg})'
 
     def visitLetRec(self, n):
-        armsStr = '\nand\n'.join(
-                self._i(f'{arm.name} ({arm.arg} : {self(arm.argTy)}) =\n{self._i(self(arm.val))}')
-                for arm in n.arms())
+        armsStr = '\nand\n'.join(self._i(self(arm)) for arm in n.arms())
         return f"""letrec
 {armsStr}
 in
 {self._i(self(n.body()))}"""
-
-        header += '   and '.join(
-                f'{arm.name} ({arm.arg} : {self(arm.argTy)}) = {self(arm.val)}' for arm in n.arms())
-        header += '\nin'
-        header += self._i(self(n.body()))
-        return header
 
     def visitBinOp(self, n):
         return f'({self(n.lhs())} {n.op()} {self(n.rhs())})'
@@ -93,4 +81,13 @@ else
     def visitSeq(self, n):
         return ' ;\n'.join(self.visitChildren(n))
 
+    def visitLetRecArm(self, arm):
+        return f'{arm.name()} ({arm.arg()} : {self(arm.argTy())}) =\n{self._i(self(arm.val()))}'
+
+    def visitIdxVarRef(self, n):
+        idx, sub = n.idx(), n.sub()
+        if sub is None:
+            return f'${idx}'
+        else:
+            return f'${idx}.{sub}'
 

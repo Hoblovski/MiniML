@@ -89,6 +89,45 @@ class ASTVisitor:
         return self.visit(node)
 
 
+class ASTTransformer(ASTVisitor):
+    def visitChildren(self, node):
+        for idx, ch in enumerate(node._c):
+            if node.bunched and isinstance(ch, list):
+                for idx2, chch in enumerate(ch):
+                    ch[idx2] = self(chch)
+            else:
+                node._c[idx] = self(ch)
+
+    # Default: `self.joinResults(self.visitorName(node))`
+    # Override: simply define `visitXXX`
+    #
+    # Note that `node` may not necessarily be of type XXNode.
+    # For example it could be a string.
+    #
+    # The default impl could be slow...
+    def visit(self, node):
+        if not isinstance(node, ASTNode):
+            return node
+
+        if hasattr(self, f'visit{node.nodeName()}'):
+            f = getattr(self, f'visit{node.nodeName()}')
+            node = f(node)
+            return node
+
+        if hasattr(node, f'accept{self.visitorName()}'):
+            f = getattr(node, f'accept{self.visitorName()}')
+            node = f(self)
+            return node
+
+        if hasattr(node, f'accept'):
+            f = getattr(node, f'accept')
+            node = f(self)
+            return node
+
+        self.visitChildren(node)
+        return node
+
+
 class IndentedPrintVisitor(ASTVisitor):
     INDENT = '|   ' # indentation block
 

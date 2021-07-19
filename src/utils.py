@@ -8,6 +8,13 @@ class MiniMLError(Exception):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, *kwargs)
 
+class MiniMLLocatedError(Exception):
+    def __init__(self, n, msg):
+        self.msg = f'At {n.pos[0]}, {n.pos[1]}: {msg}'
+
+    def __str__(self):
+        return self.msg
+
 def getSymbolicNames(Lexer:type):
     intAttrs = set([a for a in dir(Lexer) if type(getattr(Lexer, a)) is int])
     ignoreAttrs = { "DEFAULT_MODE", "DEFAULT_TOKEN_CHANNEL", "HIDDEN",
