@@ -5,7 +5,7 @@ from antlr4 import *
 from .utils import *
 from .generated.MiniMLLexer import MiniMLLexer
 from .generated.MiniMLParser import MiniMLParser
-from .frontend import ConstructASTVisitor, FormattedPrintVisitor, NamerVisitor
+from .frontend import ConstructASTVisitor, FormattedPrintVisitor, NamerVisitor, SECDGenVisitor
 
 
 def printAst(ast):
@@ -27,8 +27,8 @@ def doParseArgs(argv):
             '-f', '--formatted', action='store_true',
             help='Print formatted code rather than ast')
     parser.add_argument(
-            '-s', '--stage', type=str, choices={'l', 'c', 'a', 'name'},
-            help='[Debug] print debug info for that stage (lex, cst, ast, name)')
+            '-s', '--stage', type=str, choices={'l', 'c', 'a', 'name', 'secd'},
+            help='[Debug] print debug info for that stage (lex, cst, ast, name, secd)')
     parser.add_argument(
             '-bt', '--backtrace', action='store_true',
             help='[Debug] print backtrace within compiler on any error')
@@ -77,6 +77,13 @@ def doNamer(ast):
     return ast
 
 
+def doSECD(ast):
+    secd = SECDGenVisitor().visit(ast)
+    if args.stage == 'secd':
+        print(secd)
+        exit(0)
+    return secd
+
 
 def main(argv):
     try:
@@ -87,6 +94,7 @@ def main(argv):
         cst = doParse(tokens)
         ast = doConstructAST(cst)
         namedAst = doNamer(ast)
+        secd = doSECD(namedAst)
         return 0
     except MiniMLError as e:
         if args.backtrace:
