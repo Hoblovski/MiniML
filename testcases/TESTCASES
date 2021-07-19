@@ -1,0 +1,7 @@
+f2c2: // i.e. func first class citizen
+    curry
+
+recursion:
+    fact
+    gcd
+    evenodd

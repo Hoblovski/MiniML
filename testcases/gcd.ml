@@ -1,4 +1,4 @@
-let gcd = \a : int -> \b : int ->
+let rec gcd a = \b ->
     if a == 0 then
         b
     else

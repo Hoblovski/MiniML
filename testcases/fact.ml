@@ -1,5 +1,5 @@
-let fact : int -> int = \n : int ->
-    if n <= 0 then
+let rec fact (n : int) =
+    if n == 0 then
         1
     else
         n * fact (n-1)
