@@ -91,3 +91,14 @@ else
         else:
             return f'${idx}.{sub}'
 
+    def visitIdxLetRecArm(self, arm):
+        return f'LamArm {self(arm.argTy())} =\n{self._i(self(arm.val()))}'
+
+    def visitIdxLam(self, n):
+        bodyStr = self(n.body())
+        res = f'Lam {self(n.ty())} ->'
+        if len(bodyStr) < 40 and '\n' not in bodyStr:
+            return f'({res} {bodyStr})'
+        else:
+            return f'({res}\n{self._i(bodyStr)})'
+
