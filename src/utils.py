@@ -36,6 +36,11 @@ def panic(msg):
     print(msg)
     raise MiniMLError('compiler panicked')
 
+def asinstance(obj, ty):
+    if not isinstance(obj, ty):
+        raise TypeError(f'cannot convert {obj} into {ty}')
+    return obj
+
 def text(x):
     if isinstance(x, str):
         return x

@@ -1,43 +1,72 @@
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 from ..utils import *
 from ..common import *
-from .ast import ASTNode
+from .ast import ASTNode, TermNode
 
-def NodeClassFactory(nodeName, fieldNames, Base=ASTNode, bunched=False, **kwargs):
-    def __init__(self, ctx=None, pos=None, **kwargs):
+def nodeClassFactory(className, nodeName, fieldNames,
+        bunchedFields=None, termFields=None, Base=ASTNode):
+
+    bunchedFields = bunchedFields or []
+    termFields = termFields or []
+    if not (set(bunchedFields) <= set(fieldNames)):
+        raise MiniMLError(
+                f'bunchedFields {bunchedFields} need be subset of fields {fieldNames}')
+    if not (set(termFields) <= set(fieldNames)):
+        raise MiniMLError(
+                f'termFields {termFields} need be subset of fields {fieldNames}')
+
+    def initf(self, pos=None, ctx=None, **kwargs):
         # Python >=3.6 preserves order of kwargs
         if set(kwargs.keys()) != set(fieldNames):
             raise MiniMLError(f'fields {fieldNames} expected, given {kwargs.keys()}')
         # Set children (for traversal)
         pos = pos or ctxPos(ctx)
-        Base.__init__(self, kwargs.values(), pos=pos, bunched=bunched)
-        # Set Accessors
-        for idx, (field, value) in enumerate(kwargs.items()):
-            def f(new=None, _idx=idx): # loop lambda caveat
-                if new is None:
-                    return self._c[_idx]
-                else:
-                    self._c[_idx] = new
-            setattr(self, field, f)
-    initDict = {"__init__": __init__}
-    nodeClass = type(nodeName, (Base,) , {**initDict, **kwargs})
+        for termf in termFields:
+            kwargs[termf] = TermNode(kwargs[termf], pos)
+        Base.__init__(self, OrderedDict(kwargs), pos=pos)
+
+    def accessorFactory(name):
+        def getter(self):
+            return self._c[name]
+        def setter(self, new):
+            self._c[name] = new
+        return (getter, setter)
+
+    accessors = {f: property(*accessorFactory(f)) for f in fieldNames}
+    d = {'__init__': initf, 'NodeName': nodeName, 'bunchedFields': bunchedFields, **accessors}
+    nodeClass = type(className, (Base,), d)
     return nodeClass
 
 
-TyNode = NodeClassFactory('TyNode', ('base', 'rhs'))
-TopNode = NodeClassFactory('TopNode', ('expr',))
-LamNode = NodeClassFactory('LamNode', ('name', 'ty', 'body'))
-SeqNode = NodeClassFactory('SeqNode', ('subs',), bunched=True)
-AppNode = NodeClassFactory('AppNode', ('fn', 'arg'))
-LitNode = NodeClassFactory('LitNode', ('val',))
-VarRefNode = NodeClassFactory('VarRefNode', ('name',))
+def createNodes(spec):
+    spec = [x.split() for x in spec.strip().split('\n') if x != '']
+    for nodeName, _, *fieldNames in spec:
+        bunchedFields = [ f[:-1] for f in fieldNames if f.endswith('+') ]
+        termFields = [ f[:-1] for f in fieldNames if f.endswith('.') ]
+        fieldNames = [f.replace('+', '').replace('.', '') for f in fieldNames]
+        className = nodeName + 'Node'
+        nodeClass = nodeClassFactory(className, nodeName, fieldNames,
+                bunchedFields=bunchedFields, termFields=termFields)
+        # black magic
+        globals()[className] = nodeClass
 
-LetRecArmNode = NodeClassFactory('LetRecArmNode', ('name', 'arg', 'argTy', 'val'))
-LetRecNode = NodeClassFactory('LetRecNode', ('arms', 'body'), bunched=True)
-BuiltinNode = NodeClassFactory('BuiltinNode', ('name',))
+spec = """
+TyUnk     :
+TyBase    : name.
+TyLam     : lhs rhs
+Top       : expr
+Lam       : name.  ty  body
+Seq       : subs+
+App       : fn  arg
+Lit       : val.
+VarRef    : name.
+LetRecArm : name.  arg.  argTy  val
+LetRec    : arms+  body
+Builtin   : name.
+Ite       : cond  tr  fl
+BinOp     : lhs  op.  rhs
+UnaOp     : op.  sub
+"""
 
-IteNode = NodeClassFactory('IteNode', ('cond', 'tr', 'fl'))
-BinOpNode = NodeClassFactory('BinOpNode', ('lhs', 'op', 'rhs'))
-UnaOpNode = NodeClassFactory('UnaOpNode', ('op', 'sub'))
-
+createNodes(spec)

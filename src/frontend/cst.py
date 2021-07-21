@@ -4,10 +4,10 @@ from ..generated.MiniMLParser import MiniMLParser
 from ..generated.MiniMLVisitor import MiniMLVisitor
 from .astnodes import *
 
-def _accept(ctx, visitor):
-    if ctx is None:
-        return None
-    return ctx.accept(visitor)
+def _acceptMaybeTy(ctx, visitor):
+    if ctx.ty() is None:
+        return TyUnkNode(ctx=ctx)
+    return ctx.ty().accept(visitor)
 
 class ConstructASTVisitor(MiniMLVisitor):
     """
@@ -32,19 +32,19 @@ class ConstructASTVisitor(MiniMLVisitor):
     def visitLetRecArm(self, ctx:MiniMLParser.LetRecArmContext):
         return LetRecArmNode(ctx=ctx,
                 name=text(ctx.Ident(0)), arg=text(ctx.Ident(1)),
-                argTy=_accept(ctx.ty(), self), val=ctx.expr().accept(self))
+                argTy=_acceptMaybeTy(ctx, self), val=ctx.expr().accept(self))
 
     def visitLet2(self, ctx:MiniMLParser.Let2Context):
         # Desugar: let X: T = E0 in E1  =>   (\\X:T -> E1)(E0)
         return AppNode(ctx=ctx,
                 fn=LamNode(ctx=ctx,
-                    name=text(ctx.Ident()), ty=_accept(ctx.ty(), self),
+                    name=text(ctx.Ident()), ty=_acceptMaybeTy(ctx, self),
                     body=ctx.expr(1).accept(self)),
                 arg=ctx.expr(0).accept(self))
 
     def visitLam1(self, ctx:MiniMLParser.Lam1Context):
         return LamNode(ctx=ctx,
-                name=text(ctx.Ident()), ty=_accept(ctx.ty(), self),
+                name=text(ctx.Ident()), ty=_acceptMaybeTy(ctx, self),
                 body=ctx.expr().accept(self))
 
     def visitSeq(self, ctx:MiniMLParser.SeqContext):
@@ -105,14 +105,14 @@ class ConstructASTVisitor(MiniMLVisitor):
                 name='println')
 
     def visitTyInt(self, ctx:MiniMLParser.TyIntContext):
-        return TyNode(ctx=ctx,
-                base='int', rhs=None)
+        return TyBaseNode(ctx=ctx,
+                name='int')
 
     def visitTyArrow(self, ctx:MiniMLParser.TyArrowContext):
-        return TyNode(ctx=ctx,
-                base=ctx.ty(0).accept(self), rhs=ctx.ty(1).accept(self))
+        return TyLamNode(ctx=ctx,
+                lhs=ctx.ty(0).accept(self), rhs=ctx.ty(1).accept(self))
 
     def visitTyUnit(self, ctx:MiniMLParser.TyUnitContext):
-        return TyNode(ctx=ctx,
-                base='unit', rhs=None)
+        return TyBaseNode(ctx=ctx,
+                name='unit')
 

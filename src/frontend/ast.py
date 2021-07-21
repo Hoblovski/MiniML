@@ -5,146 +5,175 @@ custom fashion.
 
 from ..utils import *
 from ..common import *
+from collections import OrderedDict
 
 class ASTNode:
     """
-    The generic AST Node.
+    The raw generic AST Node.
     Implements: location, __str__.
+    Subclasses need to implement field accessors (better never access _c directly)
 
-    *NOTE: Subclass names must end with `Node`.
+    @param `bunchedFields`: subset of `chs` (can also be a list)
+        Children that contain a list of ASTNodes.
+        Visitors visit the list's entries, instead of treating it as a terminal node.
 
-    @param bunched: Varargs node.
-        Always has fields of type `list` (not tuple etc!).
-        When flattened that field contains a list of ASTNodes.
-        Visitors shall treat them differently.
+    INVARIANT:
+        type(x) is list | ASTNode       forall x in self._c
+            and type(x) is list, its entries are ASTNode
+
+    NOTE:
+        subclasses must have:
+            self.__class__.NodeName defined
+            self.__class__.bunchedFields  defined
     """
 
-    def __init__(self, chs, pos=None, bunched=False):
-        self._c = list(chs) # Never alias these entries elsewhere.
-        self.pos = pos or (-1, -1)
-        self.bunched = bunched
+    def __init__(self, chs:OrderedDict, pos=(-1, -1)):
+        self._c = chs
+        self.pos = pos
 
     def __str__(self):
-        return IndentedPrintVisitor().visit(self)
+        return IndentedPrintVisitor()(self)
 
-    def nodeName(self):
-        name = self.__class__.__name__
-        assert name.endswith('Node')
-        return name[:-4]
+    # Override me
+    @property
+    def NodeName(self):
+        raise MiniMLError(f'Undefined NodeName for {type(self)}')
+
+    # Override me
+    @property
+    def bunchedFields(self):
+        raise MiniMLError(f'Undefined bunchedFields for {type(self)}')
+
+
+class TermNode(ASTNode):
+    """
+    Wrapper around terminal nodes, so that all nodes in an AST are of type `ASTNode`.
+    """
+    NodeName = 'Terminal'
+
+    def __init__(self, value, pos=(-1, -1)):
+        ASTNode.__init__(self, OrderedDict(), pos)
+        self._v = value
+
+    def getv(self):
+        return self._v
+
+    def setv(self, new):
+        self._v = new
+
+    def __str__(self):
+        return str(self.value)
+
+    value = property(getv, setv)
 
 
 class ASTVisitor:
     """
-    The generic AST visitor.
+    NOTE:
+        subclasses must have:
+            self.__class__.VisitorName defined
     """
-    def visitChildren(self, node):
+    # Override me.
+    def joinResults(self, n, chRes):
+        pass
+
+    # Override me.
+    def visitTermNode(self, n):
+        pass
+
+    # Override me
+    @property
+    def VisitorName(self):
+        raise MiniMLError(f'Undefined VisitorName for {type(self)}')
+
+    def visit(self, n):
+        """
+        Default:
+          self.joinResults( n, self.visitChildren(n) )
+
+        Override:
+          derivedVisitor.visit{NodeName}
+          node.accept{VisitorName}
+          node.accept
+        """
+        if isinstance(n, TermNode):
+            return self.visitTermNode(n)
+        if hasattr(self, f'visit{n.NodeName}'):
+            f = getattr(self, f'visit{n.NodeName}')
+            return f(n)
+        if hasattr(n, f'accept{self.VisitorName}'):
+            f = getattr(n, f'accept{self.VisitorName}')
+            return f(self)
+        if hasattr(n, f'accept'):
+            f = getattr(n, f'accept')
+            return f(self)
+        res = self.visitChildren(n)
+        return self.joinResults(n, res)
+
+    def visitChildren(self, n):
         res = []
-        for ch in node._c:
-            if node.bunched and isinstance(ch, list):
+        for f, ch in n._c.items():
+            if f in n.bunchedFields:
                 res += [self(chch) for chch in ch]
             else:
                 res += [self(ch)]
         return res
 
-    # Override me.
-    def joinResults(self, res):
-        pass
-
-    # Override me.
-    def visitTerminalNode(self, node):
-        pass
-
-    def visitorName(self):
-        name = self.__class__.__name__
-        assert name.endswith('Visitor')
-        return name[:-7]
-
-    # Default: `self.joinResults(self.visitorName(node))`
-    # Override: simply define `visitXXX`
-    #
-    # Note that `node` may not necessarily be of type XXNode.
-    # For example it could be a string.
-    #
-    # The default impl could be slow...
-    def visit(self, node):
-        if not isinstance(node, ASTNode):
-            return self.visitTerminalNode(node)
-
-        if hasattr(self, f'visit{node.nodeName()}'):
-            f = getattr(self, f'visit{node.nodeName()}')
-            return f(node)
-
-        if hasattr(node, f'accept{self.visitorName()}'):
-            f = getattr(node, f'accept{self.visitorName()}')
-            return f(self)
-
-        if hasattr(node, f'accept'):
-            f = getattr(node, f'accept')
-            return f(self)
-
-        res = self.visitChildren(node)
-        return self.joinResults(res)
-
-    def __call__(self, node):
-        return self.visit(node)
+    def __call__(self, n):
+        return self.visit(n)
 
 
 class ASTTransformer(ASTVisitor):
-    def visitChildren(self, node):
-        for idx, ch in enumerate(node._c):
-            if node.bunched and isinstance(ch, list):
-                for idx2, chch in enumerate(ch):
-                    ch[idx2] = self(chch)
+    """
+    Visit functions returns the new node for substitution.
+    Node deletion not supported (do the deletion in parent node).
+    """
+    def visitChildren(self, n):
+        for f, ch in n._c.items():
+            if f in n.bunchedFields:
+                n._c[f] = [self(chch) for chch in ch]
             else:
-                node._c[idx] = self(ch)
+                n._c[f] = self(ch)
 
-    # Default: `self.joinResults(self.visitorName(node))`
-    # Override: simply define `visitXXX`
-    #
-    # Note that `node` may not necessarily be of type XXNode.
-    # For example it could be a string.
-    #
-    # The default impl could be slow...
-    def visit(self, node):
-        if not isinstance(node, ASTNode):
-            return node
+    def visit(self, n):
+        """
+        Default:
+          child = self.visit(child)   forall n.child
+          return n
 
-        if hasattr(self, f'visit{node.nodeName()}'):
-            f = getattr(self, f'visit{node.nodeName()}')
-            node = f(node)
-            return node
+        Override:
+          derivedVisitor.visit{NodeName}
+          node.accept{VisitorName}
+          node.accept
 
-        if hasattr(node, f'accept{self.visitorName()}'):
-            f = getattr(node, f'accept{self.visitorName()}')
-            node = f(self)
-            return node
-
-        if hasattr(node, f'accept'):
-            f = getattr(node, f'accept')
-            node = f(self)
-            return node
-
-        self.visitChildren(node)
-        return node
+        Note:
+          Never visit a TermNode alone.
+          Do rewrite `visit` for its parent!
+        """
+        if isinstance(n, TermNode):
+            return n
+        if hasattr(self, f'visit{n.NodeName}'):
+            f = getattr(self, f'visit{n.NodeName}')
+            return f(n)
+        if hasattr(n, f'accept{self.VisitorName}'):
+            f = getattr(n, f'accept{self.VisitorName}')
+            return f(self)
+        if hasattr(n, f'accept'):
+            f = getattr(n, f'accept')
+            return f(self)
+        self.visitChildren(n)
+        return n
 
 
 class IndentedPrintVisitor(ASTVisitor):
-    INDENT = '|   ' # indentation block
+    VisitorName = 'IndentedPrint'
+    INDENT = '|   '
 
-    def __init__(self, level=0):
-        self.level = level
+    def visitTermNode(self, n):
+        return [str(n.value)]
 
-    def visit(self, node):
-        result = self.level * IndentedPrintVisitor.INDENT
-        if isinstance(node, ASTNode):
-            result += node.nodeName() + '\n'
-            self.level += 1
-            for ch in node._c:
-                if node.bunched and isinstance(ch, list):
-                    result += ''.join(self(chch) for chch in ch)
-                else:
-                    result += self(ch)
-            self.level -= 1
-        else:
-            result += str(node) + '\n'
-        return result
+    def joinResults(self, n, chLines):
+        return [n.NodeName] + [self.INDENT + x for x in flatten(chLines)]
+
+    def visitTop(self, n):
+        return '\n'.join(self(n.expr))
