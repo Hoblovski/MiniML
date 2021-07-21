@@ -1,3 +1,5 @@
+from .utils import *
+
 LegalUnaOps = {
         '-',
 }
@@ -18,7 +20,22 @@ LegalBrOps = {
         "ble", "blt", "bge", "bgt"
 }
 
-relStrToOp = {
-    'eq': '==', 'ne': '!=', 'gt': '>',
-    'ge': '>=', 'lt': '<', 'le': '<='
+relOpToStr = {
+    '==': 'eq', '!=': 'ne', '>': 'gt',
+    '<': 'lt', '>=': 'ge', '<=': 'le'
 }
+
+relStrToOp = revertdict(relOpToStr)
+
+binOpToStr = {
+    '+': 'add', '-': 'sub', '*': 'mul', '/': 'div', '%': 'mod',
+    **relOpToStr
+}
+
+binStrToOp = revertdict(binOpToStr)
+
+unaOpToStr = {
+    '-': 'neg'
+}
+
+unaStrToOp = revertdict(unaOpToStr)

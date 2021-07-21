@@ -2,8 +2,6 @@ from copy import deepcopy
 from antlr4 import *
 from ast import literal_eval
 
-DebugAllowSugarLetExpr = False
-
 class MiniMLError(Exception):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, *kwargs)
@@ -59,6 +57,20 @@ def flatten(l):
             res += flatten(i)
         else:
             res += [i]
+    return res
+
+def revertdict(d):
+    return { v: k for k, v in d.items() }
+
+def joinlist(sep, iterable):
+    """
+        joinlist(['s', '/'], [[3], [5, 6], [7, 8]]) =
+        [3, 's', '/', 5, 6, 's', '/', 7, 8]
+    """
+    res = iterable[0]
+    for it in iterable[1:]:
+        res += sep
+        res += it
     return res
 
 class stacked_dict:

@@ -32,7 +32,7 @@ class ASTNode:
         self.pos = pos
 
     def __str__(self):
-        return IndentedPrintVisitor()(self)
+        return LISPStylePrintVisitor()(self)
 
     # Override me
     @property
@@ -177,3 +177,13 @@ class IndentedPrintVisitor(ASTVisitor):
 
     def visitTop(self, n):
         return '\n'.join(self(n.expr))
+
+
+class LISPStylePrintVisitor(ASTVisitor):
+    VisitorName = 'LISPStylePrint'
+
+    def visitTermNode(self, n):
+        return str(n.v)
+
+    def joinResults(self, n, chLines):
+        return '(' + ' '.join([n.NodeName] + chLines) + ')'

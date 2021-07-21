@@ -1,80 +1,78 @@
+from ..common import *
+from ..utils import *
+
 from .ast import *
 
 class SECDGenVisitor(ASTVisitor):
-    def joinResults(self, r):
-        return '\n'.join(r)
+    """
+    Generate SECD.
+    """
+    VisitorName = 'SECDGen'
 
-    def _i(self, lines):
-        return '    ' + '\n    '.join(lines.split('\n'))
+    def newLabel(self, namespace):
+        idx = self.labelIdx.get(namespace, 0)
+        self.labelIdx[namespace] = idx + 1
+        return f'{namespace}{idx}'
+
+    def joinResults(self, n, chRes):
+        return flatten(chRes)
 
     def __init__(self):
         self.instrs = {}
-        self.nclos = 0
-        self.noth = 0
-        # closure label -> instrs
-        self.instrs = {}
+        self.labelIdx = {}
 
     def visitTop(self, n):
-        self.instrs['main'] = self(n.expr()) + 'halt\n'
-        return '\n\n\n'.join([f'{label}:\n{self._i(instrs)}' for label, instrs in self.instrs.items()])
-
-    def visitIdxLam(self, n):
-        self.nclos += 1
-        t = self.nclos
-        self.instrs[f'p{t}'] = self(n.body()) + 'return\n'
-        return f'closure p{t}\n'
+        self.instrs['main'] = self(n.expr) + ['halt']
+        def f(instrs):
+            return '\n    '.join(['']+instrs)
+        return '\n\n\n'.join(f'{label}:{f(instrs)}'
+                for label, instrs in self.instrs.items())
 
     def visitSeq(self, n):
-        return '\n'.join(self.visitChildren(n)) + '\n'
+        # each ; discards result of its lhs
+        return joinlist(['pop 1'], self.visitChildren(n))
 
     def visitApp(self, n):
         # applyn?
-        return self(n.fn()) + self(n.arg()) + 'apply\n'
+        return self(n.fn) + self(n.arg) + ['apply']
 
     def visitLit(self, n):
-        return f'const {n.val()}\n'
+        return [f'const {n.val}']
 
-    def visitIdxVarRef(self, n):
-        if n.sub() is None:
-            return f'access ${n.idx()}\n'
-        else:
-            return f'access ${n.idx()}\n' +\
-                f'focus {n.sub()}\n'
+    def visitNVarRef(self, n):
+        return [f'access ${n.idx}']
 
-    def visitIdxLetRecArm(self, n):
-        self.nclos += 1
-        t = self.nclos
-        self.instrs[f'p{t}'] = self(n.val()) + 'return\n'
-        return f'p{t}'
+    def visitNClosRef(self, n):
+        return [f'access ${n.idx}', f'focus {n.sub}']
+
+    def visitNLam(self, n):
+        lamLabel = self.newLabel('lam')
+        self.instrs[lamLabel] = self(n.body) + ['return']
+        return [f'closure {lamLabel}']
+
+    def visitNLetRecArm(self, n):
+        closLabel = self.newLabel('clos')
+        self.instrs[closLabel] = self(n.val) + ['return']
+        return closLabel
 
     def visitLetRec(self, n):
-        arms = [self(arm) for arm in n.arms()]
-        return 'closures ' + ' '.join(arms) + '\n' + self(n.body())
+        arms = [self(arm) for arm in n.arms]
+        return ['closures ' + ' '.join(arms)] + self(n.body)
 
     def visitBuiltin(self, n):
-        return f'{n.name()}\n'
+        return [f'builtin {n.name}']
 
     def visitIte(self, n):
-        t = self.noth
-        self.noth += 3
-        cond = self(n.cond())
-        tr = self(n.tr())
-        fl = self(n.fl())
-        return f'{cond}' +\
-                f'brfl fl{t+1}\n' +\
-                f'tr{t}:\n' +\
-                f'{tr}' +\
-                f'br end{t+2}\n' +\
-                f'fl{t+1}:\n' +\
-                f'{fl}' +\
-                f'end{t+2}:\n'
+        cond, tr, fl = self(n.cond), self(n.tr), self(n.fl)
+        l1, l2, l3 = self.newLabel('tr'), self.newLabel('fl'), self.newLabel('end')
+        return cond + [f'brfl {l2}', f'{l1}:'] +\
+            tr + [f'br {l3}', f'{l2}:'] + fl + [f'{l3}:']
 
     def visitBinOp(self, n):
-        lhs = self(n.lhs())
-        rhs = self(n.rhs())
-        op = {'%': 'mod', '-': 'sub', '+': 'add', '*': 'mul', '==': 'eq', '<=': 'le'}[n.op()]
-        return lhs + rhs + f'{op}\n'
+        lhs, rhs = self(n.lhs), self(n.rhs)
+        return lhs + rhs + [binOpToStr[n.op]]
 
     def visitUnaOp(self, n):
-        assert False
+        sub = self(n.sub)
+        return sub + [unaOpToStr[n.op]]
 

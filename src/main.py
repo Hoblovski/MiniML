@@ -5,15 +5,16 @@ from antlr4 import *
 from .utils import *
 from .generated.MiniMLLexer import MiniMLLexer
 from .generated.MiniMLParser import MiniMLParser
-#from .frontend import ConstructASTVisitor, FormattedPrintVisitor, NamerVisitor, SECDGenVisitor
-from .frontend import ConstructASTVisitor, FormattedPrintVisitor, NamerVisitor
+from .frontend import *
 
 
 def printAst(ast):
-    if args.formatted:
-        print(FormattedPrintVisitor().visit(ast))
-    else:
-        print(ast)
+    if args.format == 'lisp':
+        print(LISPStylePrintVisitor()(ast), file=args.outfile)
+    elif args.format == 'indent':
+        print(IndentedPrintVisitor()(ast), file=args.outfile)
+    elif args.format == 'code':
+        print(FormattedPrintVisitor()(ast), file=args.outfile)
 
 
 def doParseArgs(argv):
@@ -25,8 +26,8 @@ def doParseArgs(argv):
             'outfile', default=sys.stdout, type=argparse.FileType('w'), nargs='?',
             help='output file, default is sysout')
     parser.add_argument(
-            '-f', '--formatted', action='store_true',
-            help='Print formatted code rather than ast')
+            '-f', '--format', choices={'lisp', 'indent', 'code'}, default='lisp',
+            help='AST print format')
     parser.add_argument(
             '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd'},
             help='[Debug] print debug info for that stage (cst, lex, ast, name, secd)')
@@ -57,7 +58,7 @@ def doParse(tokenStream):
     parser._errHandler = BailErrorStrategy()
     cst = parser.top()
     if args.stage == 'cst':
-        print(cst.toStringTree(recog=parser))
+        print(cst.toStringTree(recog=parser), file=args.outfile)
         exit(0)
     return cst
 
@@ -81,7 +82,7 @@ def doNamer(ast):
 def doSECD(ast):
     secd = SECDGenVisitor().visit(ast)
     if args.stage == 'secd':
-        print(secd)
+        print(secd, file=args.outfile)
         exit(0)
     return secd
 

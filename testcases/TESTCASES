@@ -1,5 +1,6 @@
-f2c2: // i.e. func first class citizen
+f2c2:       -- i.e. func first class citizen
     curry
+    highorder
 
 recursion:
     fact
