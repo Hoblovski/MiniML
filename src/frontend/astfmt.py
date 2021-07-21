@@ -2,7 +2,7 @@ from .ast import ASTVisitor, ASTNode
 from ..utils import *
 from ..common import *
 
-# Yet another @Example visitor
+
 class FormattedPrintVisitor(ASTVisitor):
     VisitorName = 'FormattedPrint'
     INDENT = '    '
@@ -11,7 +11,7 @@ class FormattedPrintVisitor(ASTVisitor):
         return '\n'.join([self.INDENT + l for l in s.split('\n')])
 
     def visitTermNode(self, n):
-        return str(n.value)
+        return str(n.v)
 
     def joinResults(self, n, res):
         if isinstance(res, str):
@@ -53,7 +53,7 @@ else
 
     def visitLam(self, n):
         bodyStr = self(n.body)
-        res = f'\\{self(n.name)} : {self(n.ty)} ->'
+        res = f'\\{n.name} : {self(n.ty)} ->'
         if len(bodyStr) < 40 and '\n' not in bodyStr:
             return f'({res} {bodyStr})'
         else:
@@ -63,20 +63,19 @@ else
         return ' ;\n'.join(self.visitChildren(n))
 
     def visitLetRecArm(self, arm):
-        return f'''{self(arm.name)} ({self(arm.arg)} : {self(arm.argTy)}) =
+        return f'''{arm.name} ({arm.arg} : {self(arm.argTy)}) =
 {self._i(self(arm.val))}'''
 
-    def visitIdxVarRef(self, n):
-        idx, sub = n.idx, n.sub
-        if sub is None:
-            return f'${idx}'
-        else:
-            return f'${idx}.{sub}'
+    def visitNVarRef(self, n):
+        return f'${n.idx}'
 
-    def visitIdxLetRecArm(self, arm):
+    def visitNClosRef(self, n):
+        return f'${n.idx}.{n.sub}'
+
+    def visitNLetRecArm(self, arm):
         return f'LamArm {self(arm.argTy)} =\n{self._i(self(arm.val))}'
 
-    def visitIdxLam(self, n):
+    def visitNLam(self, n):
         bodyStr = self(n.body)
         res = f'Lam {self(n.ty)} ->'
         if len(bodyStr) < 40 and '\n' not in bodyStr:

@@ -6,7 +6,7 @@ from .utils import *
 from .generated.MiniMLLexer import MiniMLLexer
 from .generated.MiniMLParser import MiniMLParser
 #from .frontend import ConstructASTVisitor, FormattedPrintVisitor, NamerVisitor, SECDGenVisitor
-from .frontend import ConstructASTVisitor, FormattedPrintVisitor
+from .frontend import ConstructASTVisitor, FormattedPrintVisitor, NamerVisitor
 
 
 def printAst(ast):
@@ -28,8 +28,8 @@ def doParseArgs(argv):
             '-f', '--formatted', action='store_true',
             help='Print formatted code rather than ast')
     parser.add_argument(
-            '-s', '--stage', type=str, choices={'l', 'c', 'a', 'name', 'secd'},
-            help='[Debug] print debug info for that stage (lex, cst, ast, name, secd)')
+            '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd'},
+            help='[Debug] print debug info for that stage (cst, lex, ast, name, secd)')
     parser.add_argument(
             '-bt', '--backtrace', action='store_true',
             help='[Debug] print backtrace within compiler on any error')
@@ -43,7 +43,7 @@ def doLex(inputStream):
         def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
             raise MiniMLError(f'lexer error at {line},{column}')
     lexer.addErrorListener(BailErrorListener())
-    if args.stage == 'l':
+    if args.stage == 'lex':
         dumpLexerTokens(lexer)
         exit(0)
     return CommonTokenStream(lexer)
@@ -56,7 +56,7 @@ def doParse(tokenStream):
     # so we just assign to the error handler.
     parser._errHandler = BailErrorStrategy()
     cst = parser.top()
-    if args.stage == 'c':
+    if args.stage == 'cst':
         print(cst.toStringTree(recog=parser))
         exit(0)
     return cst
@@ -64,7 +64,7 @@ def doParse(tokenStream):
 
 def doConstructAST(cst):
     ast = ConstructASTVisitor().visit(cst)
-    if args.stage == 'a':
+    if args.stage == 'ast':
         printAst(ast)
         exit(0)
     return ast

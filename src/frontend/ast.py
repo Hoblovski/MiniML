@@ -62,9 +62,9 @@ class TermNode(ASTNode):
         self._v = new
 
     def __str__(self):
-        return str(self.value)
+        return str(self.v)
 
-    value = property(getv, setv)
+    v = property(getv, setv)
 
 
 class ASTVisitor:
@@ -170,7 +170,7 @@ class IndentedPrintVisitor(ASTVisitor):
     INDENT = '|   '
 
     def visitTermNode(self, n):
-        return [str(n.value)]
+        return [str(n.v)]
 
     def joinResults(self, n, chLines):
         return [n.NodeName] + [self.INDENT + x for x in flatten(chLines)]
