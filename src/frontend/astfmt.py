@@ -4,75 +4,56 @@ from ..common import *
 
 # Yet another @Example visitor
 class FormattedPrintVisitor(ASTVisitor):
+    VisitorName = 'FormattedPrint'
     INDENT = '    '
 
-    def __init__(self):
-        self.level = 0 # indentation level
-
     def _i(self, s):
-        return '\n'.join([FormattedPrintVisitor.INDENT + l for l in s.split('\n')])
+        return '\n'.join([self.INDENT + l for l in s.split('\n')])
 
-    def visitTerminalNode(self, n):
-        return str(n)
+    def visitTermNode(self, n):
+        return str(n.value)
 
-    def joinResults(self, res):
-        if len(res) > 1:
+    def joinResults(self, n, res):
+        if isinstance(res, str):
             return res
         if len(res) == 1:
             return res[0]
-        return ''
+        return '(' + ' '.join(res) + ')'
 
     def visitTop(self, n):
-        res = '-- Program Begin --------------------------------\n'
-        res += self(n.expr())
-        res += '\n-- Program End --------------------------------'
-        return res
-
-    def visitVarRef(self, n):
-        name = n.name()
-        return name
-
-    def visitLit(self, n):
-        return f'{n.val()}'
-
-    def visitBuiltin(self, n):
-        return f'{n.name()}'
+        header = '-- Program Begin --------------------------------\n'
+        footer = '\n-- Program End --------------------------------\n'
+        return header + self(n.expr) + footer
 
     def visitApp(self, n):
-        fn, arg = self(n.fn()), self(n.arg())
+        fn, arg = self(n.fn), self(n.arg)
         if max(len(fn), len(arg)) > 30:
             return f'({fn}\n {arg})'
         else:
             return f'({fn} {arg})'
 
     def visitLetRec(self, n):
-        armsStr = '\nand\n'.join(self._i(self(arm)) for arm in n.arms())
+        armsStr = '\nand\n'.join(self._i(self(arm)) for arm in n.arms)
         return f"""letrec
 {armsStr}
 in
-{self._i(self(n.body()))}"""
+{self._i(self(n.body))}"""
 
-    def visitBinOp(self, n):
-        return f'({self(n.lhs())} {n.op()} {self(n.rhs())})'
+    def visitTyUnk(self, n):
+        return '<unk>'
 
-    def visitUnaOp(self, n):
-        return f'({n.op()} {self(n.sub())})'
-
-    def visitTy(self, n):
-        if n.rhs() is None:
-            return f'{self(n.base())}'
-        else:
-            return f'({self(n.base())} -> {self(n.rhs())})'
+    def visitTyLam(self, n):
+        return f'({self(n.lhs)} -> {self(n.rhs)})'
 
     def visitIte(self, n):
-        return f'''if {self(n.cond())} then
-{self._i(self(n.tr()))}
+        return f'''if {self(n.cond)} then
+{self._i(self(n.tr))}
 else
-{self._i(self(n.fl()))}'''
+{self._i(self(n.fl))}'''
 
     def visitLam(self, n):
-        bodyStr = self(n.body())
-        res = f'\\{n.name()} : {self(n.ty())} ->'
+        bodyStr = self(n.body)
+        res = f'\\{self(n.name)} : {self(n.ty)} ->'
         if len(bodyStr) < 40 and '\n' not in bodyStr:
             return f'({res} {bodyStr})'
         else:
@@ -82,21 +63,22 @@ else
         return ' ;\n'.join(self.visitChildren(n))
 
     def visitLetRecArm(self, arm):
-        return f'{arm.name()} ({arm.arg()} : {self(arm.argTy())}) =\n{self._i(self(arm.val()))}'
+        return f'''{self(arm.name)} ({self(arm.arg)} : {self(arm.argTy)}) =
+{self._i(self(arm.val))}'''
 
     def visitIdxVarRef(self, n):
-        idx, sub = n.idx(), n.sub()
+        idx, sub = n.idx, n.sub
         if sub is None:
             return f'${idx}'
         else:
             return f'${idx}.{sub}'
 
     def visitIdxLetRecArm(self, arm):
-        return f'LamArm {self(arm.argTy())} =\n{self._i(self(arm.val()))}'
+        return f'LamArm {self(arm.argTy)} =\n{self._i(self(arm.val))}'
 
     def visitIdxLam(self, n):
-        bodyStr = self(n.body())
-        res = f'Lam {self(n.ty())} ->'
+        bodyStr = self(n.body)
+        res = f'Lam {self(n.ty)} ->'
         if len(bodyStr) < 40 and '\n' not in bodyStr:
             return f'({res} {bodyStr})'
         else:

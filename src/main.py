@@ -6,7 +6,7 @@ from .utils import *
 from .generated.MiniMLLexer import MiniMLLexer
 from .generated.MiniMLParser import MiniMLParser
 #from .frontend import ConstructASTVisitor, FormattedPrintVisitor, NamerVisitor, SECDGenVisitor
-from .frontend import ConstructASTVisitor
+from .frontend import ConstructASTVisitor, FormattedPrintVisitor
 
 
 def printAst(ast):

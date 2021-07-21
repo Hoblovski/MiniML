@@ -75,7 +75,7 @@ class ASTVisitor:
     """
     # Override me.
     def joinResults(self, n, chRes):
-        pass
+        return chRes
 
     # Override me.
     def visitTermNode(self, n):
