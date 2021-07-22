@@ -15,9 +15,7 @@ AllBuiltins = {
 }
 
 LegalBrOps = {
-        "br",
-        "beqz", "bnez", "beq", "bne",
-        "ble", "blt", "bge", "bgt"
+        'br', 'brfl'
 }
 
 relOpToStr = {

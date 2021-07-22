@@ -25,10 +25,15 @@ typedef void (*fn_t)(void);
 #define load(a)     (*(val*) (a))
 #define store(a, v) ((*(val*) (a)) = ((val) (v)))
 #define call(fn)    (((fn_t) (fn))())
-#define new(n)      ((val) malloc(n))
+
+static inline val _new(int n) {
+    val rv = (val) malloc(n);
+    assert(rv != 0 && "malloc returns NULL");
+    return rv;
+}
 
 static inline void _pushs(val v) {
-    val t = new(8);
+    val t = _new(8);
     store(t, sp);
     store(t+4, v);
     sp = t;
@@ -40,8 +45,8 @@ static inline val _pops() {
     return r;
 }
 
-static inline void pushe(val v) {
-    val t = new(8);
+static inline void _pushe(val v) {
+    val t = _new(8);
     store(t, ep);
     store(t+4, v);
     ep = t;
@@ -54,14 +59,14 @@ static inline val _pope() {
 }
 
 static inline void _pushe1(val *ep, val v) {
-    val t = new(8);
+    val t = _new(8);
     store(t, *ep);
     store(t+4, v);
     *ep = t;
 }
 
 #define Iclosure(lam) do {                     \
-    val t = new(3*4);                          \
+    val t = _new(3*4);                         \
     store(t, lam);                             \
     store(t+4, 0);                             \
     store(t+8, ep);                            \
@@ -110,20 +115,20 @@ static inline void _pushe1(val *ep, val v) {
 #define Iclosures(...) do {                    \
     fn_t fns[] =  { __VA_ARGS__ };             \
     int len = sizeof(fns) / sizeof(fns[0]);    \
-    val t = new(3*4);                          \
+    val t = _new(3*4);                         \
     store(t, 0);                               \
-    val t1 = new(n*4)                          \
+    val t1 = _new(len*4);                      \
     store(t+4, t1);                            \
     for (int i = 0; i < len; i++)              \
-        store(t1 + 4*i, fns[i])                \
+        store(t1 + 4*i, fns[i]);               \
     store(t+8, ep);                            \
-    _pushs(t);                                 \
+    _pushe(t);                                 \
 } while (0);
 
 #define Ifocus(n) do {                         \
     val t = _pops();                           \
     val fns = load(t+4);                       \
-    val fn = load(fns + 4*n);                  \
+    val fn = load(fns + 4*(n-1));              \
     store(t, fn);                              \
     _pushs(t);                                 \
 } while (0);
@@ -138,6 +143,17 @@ static inline void _pushe1(val *ep, val v) {
 
 #define Ihalt() do {                           \
     return;                                    \
+} while (0);
+
+#define Ilabel(lbl) lbl:
+
+#define Ibr(lbl) do {                          \
+    goto lbl ;                                 \
+} while (0);
+
+#define Ibr1(pred, lbl) do {                   \
+    val t = _pops();                           \
+    if (pred (t)) goto lbl;                    \
 } while (0);
 
 static inline void builtin_println(void) {

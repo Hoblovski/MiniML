@@ -29,7 +29,7 @@ def instrClassFactory(className, instrName, fieldNames, vararg=False, Base=SECDI
     def fmtCf(self):
         a = self._args[0] if vararg else self._args
         argStr = ', '.join(str(x) for x in a)
-        return f'I{self.InstrName}({argStr})'
+        return f'I{self.InstrName}({argStr});'
 
     # do not provide setters yet
     def mkGet(name, idx):
@@ -81,4 +81,12 @@ BinaryInstr.fmtSECD = lambda self: binOpToStr[self.op]
 UnaryInstr.fmtSECD = lambda self: unaOpToStr[self.op]
 LabelInstr.fmtSECD = lambda self: f'\n  {self.name}:'
 BranchInstr.fmtSECD = lambda self: f'{self.op} {self.lbl}'
-ConstInstr.InstrName = 'constint' # FIXME
+ConstInstr.fmtC = lambda self: f'Iconstint({self.val});' # FIXME
+
+
+def branchFmtC(self):
+    if self.op == 'br':
+        return f'Ibr({self.lbl});'
+    elif self.op == 'brfl':
+        return f'Ibr1(0 ==, {self.lbl});'
+BranchInstr.fmtC = branchFmtC
