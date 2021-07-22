@@ -29,11 +29,10 @@ class SECDGenVisitor(ASTVisitor):
                 for label, instrs in self.instrs.items())
 
     def visitSeq(self, n):
-        # each ; discards result of its lhs
+        # each semicolon discards result of its lhs
         return joinlist(['pop 1'], self.visitChildren(n))
 
     def visitApp(self, n):
-        # applyn?
         return self(n.fn) + self(n.arg) + ['apply']
 
     def visitLit(self, n):

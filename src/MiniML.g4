@@ -39,22 +39,22 @@ ite
 
 rel
     : add                                      # rel0
-    | rel RelOp add                            # rel1
+    | rel relOp add                            # rel1
     ;
 
 add
     : mul                                      # add0
-    | add AddOp mul                            # add1
+    | add addOp mul                            # add1
     ;
 
 mul
     : una                                      # mul0
-    | mul MulOp una                            # mul1
+    | mul mulOp una                            # mul1
     ;
 
 una
     : app                                      # una0
-    | UnaOp una                                # una1
+    | unaOp una                                # una1
     ;
 
 app
@@ -77,10 +77,10 @@ ty
     | <assoc=right> ty '->' ty                 # tyArrow
     ;
 
-MulOp : '*' | '/' | '%' ;
-AddOp : '+' | '-' ;
-RelOp : '>' | '<' | '>=' | '<=' | '==' | '!=' ;
-UnaOp : '-' ;
+mulOp : '*' | '/' | '%' ;
+addOp : '+' | '-' ;
+relOp : '>' | '<' | '>=' | '<=' | '==' | '!=' ;
+unaOp : '-' ;
 
 Integer
     : Digit+

@@ -61,22 +61,22 @@ class ConstructASTVisitor(MiniMLVisitor):
 
     def visitRel1(self, ctx:MiniMLParser.Rel1Context):
         return BinOpNode(ctx=ctx,
-                lhs=ctx.rel().accept(self), op=text(ctx.RelOp()),
+                lhs=ctx.rel().accept(self), op=text(ctx.relOp()),
                 rhs=ctx.add().accept(self))
 
     def visitAdd1(self, ctx:MiniMLParser.Add1Context):
         return BinOpNode(ctx=ctx,
-                lhs=ctx.add().accept(self), op=text(ctx.AddOp()),
+                lhs=ctx.add().accept(self), op=text(ctx.addOp()),
                 rhs=ctx.mul().accept(self))
 
     def visitMul1(self, ctx:MiniMLParser.Mul1Context):
         return BinOpNode(ctx=ctx,
-                lhs=ctx.mul().accept(self), op=text(ctx.MulOp()),
+                lhs=ctx.mul().accept(self), op=text(ctx.mulOp()),
                 rhs=ctx.una().accept(self))
 
     def visitUna1(self, ctx:MiniMLParser.Una1Context):
         return UnaOpNode(ctx=ctx,
-                op=text(ctx.UnaOp()), sub=ctx.una().accept(self))
+                op=text(ctx.unaOp()), sub=ctx.una().accept(self))
 
     def visitApp1(self, ctx:MiniMLParser.App1Context):
         return AppNode(ctx=ctx,
