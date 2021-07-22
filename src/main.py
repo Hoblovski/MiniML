@@ -29,8 +29,8 @@ def doParseArgs(argv):
             '-f', '--format', choices={'lisp', 'indent', 'code'}, default='lisp',
             help='AST print format')
     parser.add_argument(
-            '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd'},
-            help='[Debug] print debug info for that stage (cst, lex, ast, name, secd)')
+            '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd', 'c'},
+            help='[Debug] print debug info for that stage')
     parser.add_argument(
             '-bt', '--backtrace', action='store_true',
             help='[Debug] print backtrace within compiler on any error')
@@ -82,7 +82,10 @@ def doNamer(ast):
 def doSECD(ast):
     secd = SECDGenVisitor().visit(ast)
     if args.stage == 'secd':
-        print(secd, file=args.outfile)
+        print(secd.emit(fmt='secdi'), file=args.outfile)
+        exit(0)
+    elif args.stage == 'c':
+        print(secd.emit(fmt='c'), file=args.outfile)
         exit(0)
     return secd
 

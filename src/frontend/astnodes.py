@@ -57,7 +57,6 @@ def createNodes(spec):
         className = nodeName + 'Node'
         nodeClass = nodeClassFactory(className, nodeName, fieldNames,
                 bunchedFields=bunchedFields, termFields=termFields)
-        # black magic
         classes[className] = nodeClass
     return classes
 
