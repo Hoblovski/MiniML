@@ -83,3 +83,18 @@ else
         else:
             return f'({res}\n{self._i(bodyStr)})'
 
+    def visitMatch(self, n):
+        armsStr = '\n'.join(self(arm) for arm in n.arms)
+        return f"""match {self(n.expr)}
+{armsStr}
+end"""
+
+    def visitMatchArm(self, n):
+        return f"""| {self(n.ptn)} ->
+{self._i(self(n.expr))}"""
+
+    def visitIdentPtn(self, n):
+        return f'{n.name}'
+
+    def visitTuplePtn(self, n):
+        return ', '.join(f'({self(sub)})' for sub in n.subs)

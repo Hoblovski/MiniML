@@ -9,7 +9,7 @@ expr
     ;
 
 let
-    : lam                                                # let0
+    : mat                                                # let_
     | 'let rec' (letRecArm ('and' letRecArm)*) 'in' expr # let1
     | 'let' Ident (':' ty)? '=' expr 'in' expr           # let2
     ;
@@ -19,9 +19,28 @@ letRecArm
     | Ident '(' Ident ':' ty ')' '=' expr
     ;
 
+mat
+    : lam                                     # mat_
+    | 'match' expr ('|' ptn '->' expr)+ 'end' # mat1
+    ;
+
+ptn
+    : ptn1
+    ;
+
+ptn1
+    : ptn0             # ptn1_
+    | ptn0 (',' ptn0)+ # ptnTuple
+    ;
+
+ptn0
+    : Ident          # ptnBinder
+    | '(' ptn ')'    # ptnParen
+    ;
+
 lam
-    : seq                                                # lam0
-    | '\\' Ident (':' ty)? '->' expr                     # lam1
+    : seq                            # lam_
+    | '\\' Ident (':' ty)? '->' expr # lam1
     ;
 
 seq
@@ -29,48 +48,53 @@ seq
     ;
 
 ite
-    : rel                                                # ite0
-    | 'if' rel 'then' rel 'else' ite                     # ite1
+    : rel                            # ite_
+    | 'if' rel 'then' rel 'else' ite # ite1
     ;
 
 rel
-    : add                                                # rel0
-    | rel relOp add                                      # rel1
+    : add           # rel_
+    | rel relOp add # rel1
     ;
 
 add
-    : mul                                                # add0
-    | add addOp mul                                      # add1
+    : mul           # add_
+    | add addOp mul # add1
     ;
 
 mul
-    : una                                                # mul0
-    | mul mulOp una                                      # mul1
+    : una           # mul_
+    | mul mulOp una # mul1
     ;
 
 una
-    : app                                                # una0
-    | unaOp una                                          # una1
+    : app       # una_
+    | unaOp una # una1
     ;
 
 app
-    : atom                                               # app0
-    | app atom                                           # app1
+    : atom     # app_
+    | app atom # app1
     ;
 
 atom
-    : '(' ')'                                            # atomUnit
-    | Integer                                            # atomInt
-    | Ident                                              # atomIdent
-    | '(' expr ')'                                       # atomParen
-    | 'println'                                          # atomPrint
+    : '(' ')'                  # atomUnit
+    | '(' expr (',' expr)+ ')' # atomTuple
+    | lit                      # atomLit
+    | Ident                    # atomIdent
+    | '(' expr ')'             # atomParen
+    | 'println'                # atomPrint
+    ;
+
+lit
+    : Integer # litInt
     ;
 
 ty
-    : 'unit'                                             # tyUnit
-    | 'int'                                              # tyInt
-    | '(' ty ')'                                         # tyParen
-    | <assoc=right> ty '->' ty                           # tyArrow
+    : 'unit'                   # tyUnit
+    | 'int'                    # tyInt
+    | '(' ty ')'               # tyParen
+    | <assoc=right> ty '->' ty # tyArrow
     ;
 
 mulOp : '*' | '/' | '%' ;
