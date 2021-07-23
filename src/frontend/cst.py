@@ -23,11 +23,8 @@ class ConstructASTVisitor(MiniMLVisitor):
 
     def visitLet1(self, ctx:MiniMLParser.Let1Context):
         return LetRecNode(ctx=ctx,
-                arms=ctx.letRecArms().accept(self),
+                arms=[arm.accept(self) for arm in ctx.letRecArm()],
                 body=ctx.expr().accept(self))
-
-    def visitLetRecArms(self, ctx:MiniMLParser.LetRecArmsContext):
-        return [arm.accept(self) for arm in ctx.letRecArm()]
 
     def visitLetRecArm(self, ctx:MiniMLParser.LetRecArmContext):
         return LetRecArmNode(ctx=ctx,
