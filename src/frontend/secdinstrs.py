@@ -75,7 +75,10 @@ unary    : op
 branch   : op lbl
 label    : name
 pushenv  :
+nth      : n
+mktuple  : n
 """
+# mktuple has rhs on the top, lhs below
 globals().update(createInstrs(spec))
 
 BinaryInstr.fmtSECD = lambda self: binOpToStr[self.op]

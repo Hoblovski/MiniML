@@ -90,5 +90,10 @@ class SECDGenVisitor(ASTVisitor):
         return sub + [UnaryInstr(n.op)]
 
     def visitNLet(self, n):
-        val, body = self(n.val), self(n.body)
-        return val + [PushenvInstr()] + body
+        return self(n.val) + [PushenvInstr()] + self(n.body)
+
+    def visitNth(self, n):
+        return self(n.expr) + [NthInstr(n.idx)]
+
+    def visitTuple(self, n):
+        return joinlist([], self.visitChildren(n)) + [MktupleInstr(len(n.subs))]

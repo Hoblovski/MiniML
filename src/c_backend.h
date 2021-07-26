@@ -161,6 +161,22 @@ static inline void _pushe1(val *ep, val v) {
     if (pred (t)) goto lbl;                    \
 } while (0);
 
+#define Imktuple(n) do {                       \
+    val t = _new(4*n);                         \
+    for (int i = 0; i < n; i++) {              \
+        val t1 = _pops();                      \
+        store(t + 4 * (n-1-i), t1);            \
+    }                                          \
+    _pushs(t);                                 \
+} while (0);
+
+#define Inth(n) do {                           \
+    val t = _pops();                           \
+    val t1 = load(t + 4*n);                    \
+    _pushs(t1);                                \
+} while (0);
+
+
 static inline void builtin_println(void) {
     val v = ep_v;
     printf("%d\n", v);
