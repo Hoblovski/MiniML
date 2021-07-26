@@ -10,6 +10,9 @@ class FormattedPrintVisitor(ASTVisitor):
     def _i(self, s):
         return '\n'.join([self.INDENT + l for l in s.split('\n')])
 
+    def _q(self, s):
+        return s if ' ' not in s else f'({s})'
+
     def visitTermNode(self, n):
         return str(n.v)
 
@@ -31,6 +34,16 @@ class FormattedPrintVisitor(ASTVisitor):
             return f'({fn}\n {arg})'
         else:
             return f'({fn} {arg})'
+
+    def visitLet(self, n):
+        valStr = self(n.val)
+        if len(valStr) < 15:
+            return f"""let {n.name} : {self(n.ty)} = {valStr} in
+{self(n.body)}"""
+        else:
+            return f"""let {n.name} : {self(n.ty)} =
+{self._i(valStr)} in
+{self(n.body)}"""
 
     def visitLetRec(self, n):
         armsStr = '\nand\n'.join(self._i(self(arm)) for arm in n.arms)
@@ -98,3 +111,12 @@ end"""
 
     def visitTuplePtn(self, n):
         return ', '.join(f'({self(sub)})' for sub in n.subs)
+
+    def visitNIdentPtn(self, n):
+        return '@'
+
+    def visitNTuplePtn(self, n):
+        return ', '.join(f'{self._q(self(sub))}' for sub in n.subs)
+
+    def visitNth(self, n):
+        return f'nth {n.idx} {self(n.expr)}'

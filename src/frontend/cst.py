@@ -9,6 +9,14 @@ def _acceptMaybeTy(ctx, visitor):
         return TyUnkNode(ctx=ctx)
     return ctx.ty().accept(visitor)
 
+# desugared let. deprecated.
+def _Let(pos, name, val, ty, body):
+    return AppNode(ctx=ctx,
+            fn=LamNode(ctx=ctx,
+                name=text(ctx.Ident()), ty=_acceptMaybeTy(ctx, self),
+                body=ctx.expr(1).accept(self)),
+            arg=ctx.expr(0).accept(self))
+
 class ConstructASTVisitor(MiniMLVisitor):
     """
     Note this class visits the *CST*.
@@ -33,11 +41,9 @@ class ConstructASTVisitor(MiniMLVisitor):
 
     def visitLet2(self, ctx:MiniMLParser.Let2Context):
         # Desugar: let X: T = E0 in E1  =>   (\\X:T -> E1)(E0)
-        return AppNode(ctx=ctx,
-                fn=LamNode(ctx=ctx,
-                    name=text(ctx.Ident()), ty=_acceptMaybeTy(ctx, self),
-                    body=ctx.expr(1).accept(self)),
-                arg=ctx.expr(0).accept(self))
+        return LetNode(ctx=ctx,
+                name=text(ctx.Ident()), ty=_acceptMaybeTy(ctx, self),
+                val=ctx.expr(0).accept(self), body=ctx.expr(1).accept(self))
 
     def visitMat1(self, ctx:MiniMLParser.Mat1Context):
         return MatchNode(ctx=ctx,
@@ -123,6 +129,11 @@ class ConstructASTVisitor(MiniMLVisitor):
     def visitAtomPrint(self, ctx:MiniMLParser.AtomPrintContext):
         return BuiltinNode(ctx=ctx,
                 name='println')
+
+    def visitAtomNth(self, ctx:MiniMLParser.AtomNthContext):
+        return NthNode(ctx=ctx,
+                idx=int(text(ctx.Integer())),
+                expr=ctx.atom().accept(self))
 
     def visitTyInt(self, ctx:MiniMLParser.TyIntContext):
         return TyBaseNode(ctx=ctx,

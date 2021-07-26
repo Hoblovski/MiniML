@@ -48,6 +48,8 @@ def text(x):
         panic(f'invalid arg to text: {x}, type is {type(x)}')
 
 def ctxPos(ctx):
+    if ctx is None:
+        return None
     return (ctx.start.line,ctx.start.column)
 
 def flatten(l):

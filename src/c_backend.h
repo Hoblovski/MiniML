@@ -94,6 +94,11 @@ static inline void _pushe1(val *ep, val v) {
     _pushs(t);                                 \
 } while (0);
 
+#define Ipushenv(n) do {                       \
+    val v = _pops();                           \
+    _pushe(v);                                 \
+} while (0);
+
 #define Iconstint(n) do {                      \
     _pushs(n);                                 \
 } while (0);

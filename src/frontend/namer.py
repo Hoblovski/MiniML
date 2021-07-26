@@ -9,10 +9,14 @@ from .astnodes import *
 spec = """
 NLam       : ty body
 NVarRef    : idx.
-NClosRef    : idx. sub.
+NClosRef   : idx. sub.
 NLetRecArm : argTy val
-"""
+NLet       : ty val body
 
+NIdentPtn        :
+NTuplePtn        : subs+
+"""
+# idx >= 1
 globals().update(createNodes(spec))
 
 class NamerVisitor(ASTTransformer):
@@ -24,11 +28,13 @@ class NamerVisitor(ASTTransformer):
     def __init__(self):
         self.vars = []
 
-    def push(self, var):
-        self.vars = [var] + self.vars
+    def push(self, *varz):
+        varz = list(varz)
+        self.vars = varz + self.vars
+        return len(varz)
 
-    def pop(self):
-        self.vars = self.vars[1:]
+    def pop(self, n=1):
+        self.vars = self.vars[n:]
 
     def find(self, var):
         for i, v in enumerate(self.vars):
@@ -62,3 +68,10 @@ class NamerVisitor(ASTTransformer):
         n.body = self(n.body)
         self.pop()
         return n
+
+    def visitLet(self, n):
+        val = self(n.val)
+        self.push(n.name)
+        new = NLetNode(ty=n.ty, val=val, body=self(n.body))
+        self.pop()
+        return new

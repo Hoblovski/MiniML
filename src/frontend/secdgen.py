@@ -89,3 +89,6 @@ class SECDGenVisitor(ASTVisitor):
         sub = self(n.sub)
         return sub + [UnaryInstr(n.op)]
 
+    def visitNLet(self, n):
+        val, body = self(n.val), self(n.body)
+        return val + [PushenvInstr()] + body

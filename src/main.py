@@ -29,7 +29,7 @@ def doParseArgs(argv):
             '-f', '--format', choices={'lisp', 'indent', 'code'}, default='lisp',
             help='AST print format')
     parser.add_argument(
-            '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd', 'c'},
+            '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd', 'c', 'patmat'},
             help='[Debug] print debug info for that stage')
     parser.add_argument(
             '-bt', '--backtrace', action='store_true',
@@ -71,6 +71,14 @@ def doConstructAST(cst):
     return ast
 
 
+def doPatMat(ast):
+    PatMatVisitor().visit(ast)
+    if args.stage == 'patmat':
+        printAst(ast)
+        exit(0)
+    return ast
+
+
 def doNamer(ast):
     NamerVisitor().visit(ast)
     if args.stage == 'name':
@@ -98,8 +106,9 @@ def main(argv):
         tokens = doLex(inputs)
         cst = doParse(tokens)
         ast = doConstructAST(cst)
-        namedAst = doNamer(ast)
-        secd = doSECD(namedAst)
+        ast = doPatMat(ast)
+        ast = doNamer(ast)
+        secd = doSECD(ast)
         return 0
     except MiniMLError as e:
         if args.backtrace:

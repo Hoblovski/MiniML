@@ -84,6 +84,7 @@ atom
     | Ident                    # atomIdent
     | '(' expr ')'             # atomParen
     | 'println'                # atomPrint
+    | 'nth' Integer atom       # atomNth
     ;
 
 lit

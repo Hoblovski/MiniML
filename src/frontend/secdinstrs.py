@@ -74,6 +74,7 @@ binary   : op
 unary    : op
 branch   : op lbl
 label    : name
+pushenv  :
 """
 globals().update(createInstrs(spec))
 
@@ -90,3 +91,4 @@ def branchFmtC(self):
     elif self.op == 'brfl':
         return f'Ibr1(0 ==, {self.lbl});'
 BranchInstr.fmtC = branchFmtC
+

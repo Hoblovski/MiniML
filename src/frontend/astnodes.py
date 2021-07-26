@@ -21,7 +21,7 @@ def nodeClassFactory(className, nodeName, fieldNames,
         if set(kwargs.keys()) != set(fieldNames):
             raise MiniMLError(f'fields {fieldNames} expected, given {kwargs.keys()}')
         # Set children (for traversal)
-        pos = pos or ctxPos(ctx)
+        pos = pos or ctxPos(ctx) or (-1, -1)
         for termf in termFields:
             kwargs[termf] = TermNode(kwargs[termf], pos)
         Base.__init__(self, OrderedDict(kwargs), pos=pos)
@@ -66,6 +66,7 @@ TyBase                  : name.
 TyLam                   : lhs rhs
 
 Top                     : expr
+Let                     : name.  ty  val  body
 LetRec                  : arms+  body
     LetRecArm           : name.  arg.  argTy  val
 Match                   : expr arms+
@@ -82,6 +83,7 @@ Lit                     : val.
 VarRef                  : name.
 Tuple                   : subs+
 Builtin                 : name.
+Nth                     : idx. expr
 """
 
 globals().update(createNodes(spec))
