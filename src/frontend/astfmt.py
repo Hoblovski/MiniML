@@ -42,7 +42,8 @@ class FormattedPrintVisitor(ASTVisitor):
 {self(n.body)}"""
         else:
             return f"""let {n.name} : {self(n.ty)} =
-{self._i(valStr)} in
+{self._i(valStr)}
+in
 {self(n.body)}"""
 
     def visitLetRec(self, n):
@@ -109,6 +110,9 @@ end"""
     def visitIdentPtn(self, n):
         return f'{n.name}'
 
+    def visitTuple(self, n):
+        return '(' + ', '.join(f'({self(sub)})' for sub in n.subs) + ')'
+
     def visitTuplePtn(self, n):
         return ', '.join(f'({self(sub)})' for sub in n.subs)
 
@@ -119,4 +123,4 @@ end"""
         return ', '.join(f'{self._q(self(sub))}' for sub in n.subs)
 
     def visitNth(self, n):
-        return f'nth {n.idx} {self(n.expr)}'
+        return f'(nth {n.idx} {self(n.expr)})'
