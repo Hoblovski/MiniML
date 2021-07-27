@@ -176,7 +176,9 @@ class IndentedPrintVisitor(ASTVisitor):
         return [n.NodeName] + [self.INDENT + x for x in flatten(chLines)]
 
     def visitTop(self, n):
-        return '\n'.join(self(n.expr))
+        res = self.visitChildren(n)
+        res = self.joinResults(n, res)
+        return '\n'.join(res)
 
 
 class LISPStylePrintVisitor(ASTVisitor):

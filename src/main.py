@@ -52,11 +52,10 @@ def doLex(inputStream):
 
 def doParse(tokenStream):
     parser = MiniMLParser(tokenStream)
-    # BailErrorStrategy halts execution rather than try to recover on any parser error.
-    # The Python antlr4 API has not yet exposed a get/set interface,
-    # so we just assign to the error handler.
-    parser._errHandler = BailErrorStrategy()
     cst = parser.top()
+    if parser.getNumberOfSyntaxErrors() != 0:
+        print('Invalid syntax.')
+        exit(1)
     if args.stage == 'cst':
         print(cst.toStringTree(recog=parser), file=args.outfile)
         exit(0)
