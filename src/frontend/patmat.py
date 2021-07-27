@@ -111,6 +111,7 @@ class PatMatVisitor(ASTTransformer):
         return f'{namespace}_{idx}'
 
     def visitMatch(self, n):
+        self.visitChildren(n)
         e_i = self.genName('e')
         # TODO: inexhaustive match? maybe transform the return value into a function that may panic?
         body = TupleNode(pos=n.pos, subs=[LitNode(val=_FAIL), LitNode(val=_DUMMY)])
