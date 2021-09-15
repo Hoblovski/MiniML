@@ -48,7 +48,7 @@ def nodeClassFactory(className, nodeName, fieldNames,
 
 
 def createNodes(spec):
-    spec = [x.split() for x in spec.strip().split('\n') if x.strip() != '']
+    spec = [x.split() for x in spec.strip().split('\n') if x.strip() != '' and not x.startswith('#')]
     classes = {}
     for nodeName, _, *fieldNames in spec:
         bunchedFields = [ f[:-1] for f in fieldNames if f.endswith('+') ]
@@ -68,11 +68,7 @@ TyLam                   : lhs rhs
 Top                     : expr
 Let                     : name.  ty  val  body
 LetRec                  : arms+  body
-    LetRecArm           : name.  arg.  argTy  val
-Match                   : expr arms+
-    MatchArm            : ptn expr
-        IdentPtn        : name.
-        TuplePtn        : subs+
+    LetRecArm           : name.  argName.  argTy  val
 Lam                     : name.  ty  body
 Seq                     : subs+
 Ite                     : cond  tr  fl

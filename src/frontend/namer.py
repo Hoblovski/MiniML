@@ -1,77 +1,77 @@
 """
-De brujin representation.
+Fuck de brujin representations.
+While SECD uses something like them, inside the miniML compiler we have named representation for its robustness.
+
+Alpha conversion to make variables distinct.
+For let-recs, they create 'grouped closures'.
 """
 from .ast import *
 from .astnodes import *
 
-##############################################################################
-
-spec = """
-NLam       : ty body
-NVarRef    : idx.
-NClosRef   : idx. sub.
-NLetRecArm : argTy val
-NLet       : ty val body
-
-NIdentPtn        :
-NTuplePtn        : subs+
-"""
-# idx >= 1
 globals().update(createNodes(spec))
 
-class NamerVisitor(ASTTransformer):
+class NamerVisitor(ASTVisitor):
     """
-    De brujin style alpha conversion
+    Renaming process.
+
+    Modifies
+    * `n.name` for nodes.
     """
     VisitorName = 'Namer'
 
     def __init__(self):
-        self.vars = []
+        self.nameSuffix = {} # global for all scopes
+        self.vars = []       # push and pop'ed
 
-    def push(self, *varz):
-        varz = list(varz)
-        self.vars = varz + self.vars
-        return len(varz)
+    def genName(self, name, namespace='_'):
+        suffix = self.nameSuffix.get(name, 0)
+        self.nameSuffix[name] = suffix + 1
+        return namespace + name + '@' + str(suffix)
 
-    def pop(self, n=1):
-        self.vars = self.vars[n:]
+    def defVar(self, oldName):
+        # return: newName after alpha conversion
+        newName = self.genName(oldName)
+        self.vars.append((oldName, newName))
+        return newName
 
-    def find(self, var):
-        for i, v in enumerate(self.vars):
-            if isinstance(v, str) and v == var:
-                return (i, None)
-            if isinstance(v, tuple) and var in v:
-                return (i, v.index(var))
-        return None, None
+    def undefVar(self, newName_=None):
+        oldName, newName = self.vars.pop()
+        if newName_ is not None and newName != newName_:
+            raise MiniMLError(f'unmatched undefVar. arg={newName_}, pop() got={newName}')
 
     def visitVarRef(self, n):
-        idx, sub = self.find(n.name)
-        if idx is None:
-            raise MiniMLLocatedError(n, f'cannot find {n.name}')
-        if sub is None:
-            return NVarRefNode(pos=n.pos, idx=idx+1)
+        for (oldName, newName) in reversed(self.vars):
+            if n.name == oldName:
+                n.name = newName
+                break
         else:
-            return NClosRefNode(pos=n.pos, idx=idx+1, sub=sub+1)
+            raise MiniMLError(f'unknown name: {n.name}')
 
     def visitLam(self, n):
-        self.push(n.name)
-        new = NLamNode(pos=n.pos, ty=n.ty, body=self(n.body))
-        self.pop()
-        return new
+        n.name = self.defVar(n.name)
+        self(n.body)
+        self.undefVar(n.name)
 
     def visitLetRec(self, n):
-        self.push(tuple(arm.name for arm in n.arms))
-        for i, arm in enumerate(n.arms):
-            self.push(arm.arg)
-            n.arms[i] = NLetRecArmNode(pos=arm.pos, argTy=arm.argTy, val=self(arm.val))
-            self.pop()
-        n.body = self(n.body)
-        self.pop()
-        return n
+        armNames = [arm.name for arm in n.arms]
+        if not noDuplicates(armNames):
+            raise MiniMLError('duplicate names in let-rec')
+
+        for arm in n.arms:
+            arm.name = self.defVar(arm.name)
+
+        for arm in n.arms:
+            arm.argName = self.defVar(arm.argName)
+            self(arm.val)
+            self.undefVar(arm.argName)
+
+        self(n.body)
+
+        for arm in reversed(n.arms):
+            self.undefVar(arm.name)
 
     def visitLet(self, n):
-        val = self(n.val)
-        self.push(n.name)
-        new = NLetNode(ty=n.ty, val=val, body=self(n.body))
-        self.pop()
-        return new
+        n.name = self.defVar(n.name)
+        self(n.val)
+        self(n.body)
+        self.undefVar(n.name)

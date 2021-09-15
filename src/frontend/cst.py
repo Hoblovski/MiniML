@@ -36,7 +36,7 @@ class ConstructASTVisitor(MiniMLVisitor):
 
     def visitLetRecArm(self, ctx:MiniMLParser.LetRecArmContext):
         return LetRecArmNode(ctx=ctx,
-                name=text(ctx.Ident(0)), arg=text(ctx.Ident(1)),
+                name=text(ctx.Ident(0)), argName=text(ctx.Ident(1)),
                 argTy=_acceptMaybeTy(ctx, self), val=ctx.expr().accept(self))
 
     def visitLet2(self, ctx:MiniMLParser.Let2Context):

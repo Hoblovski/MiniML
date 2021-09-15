@@ -1,3 +1,7 @@
+"""
+This is possibly not well maintained.
+"""
+
 from .ast import ASTVisitor, ASTNode
 from ..utils import *
 from ..common import *
@@ -77,7 +81,7 @@ else
         return ' ;\n'.join(self.visitChildren(n))
 
     def visitLetRecArm(self, arm):
-        return f'''{arm.name} ({arm.arg} : {self(arm.argTy)}) =
+        return f'''{arm.name} ({arm.argName} : {self(arm.argTy)}) =
 {self._i(self(arm.val))}'''
 
     def visitNVarRef(self, n):

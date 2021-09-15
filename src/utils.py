@@ -103,3 +103,6 @@ class stacked_dict:
 
     def peek(self, last=0):
         return self._d[-1-last]
+
+def noDuplicates(l):
+    return len(set(l)) == len(l)
