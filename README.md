@@ -10,16 +10,18 @@ Requires:
 * [antlr](antlr.org)
   - Set `ANTLR_JAR` environment variable to the location of ANTLR jar
   - Set `CLASSPATH` to include that path
+* gcc-multilib
+  - If you want to compile to native on a 64-bit computer. (Generated native code is 32 bit).
 
 > ANTLR is great. ANTLR+Scala and ANTLR+py is even greater.
 
 Then
 ```
-# Examine command line args
-make help
+# Run parser generator
+make grammar-py
 
-# Run with makefile, print the indented AST
-make i=testcases/fact.ml e='-s ast -f indent'
+# Usage
+./miniml -h
 
 # Run with interpreter.
 ./miniml -s secd testcases/higherorder.ml path/to/output.secd
