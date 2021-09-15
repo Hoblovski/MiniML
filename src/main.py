@@ -105,7 +105,6 @@ def main(argv):
         tokens = doLex(inputs)
         cst = doParse(tokens)
         ast = doConstructAST(cst)
-        ast = doPatMat(ast)
         ast = doNamer(ast)
         secd = doSECD(ast)
         return 0
