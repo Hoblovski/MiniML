@@ -84,6 +84,8 @@ else
         return f'''{arm.name} ({arm.argName} : {self(arm.argTy)}) =
 {self._i(self(arm.val))}'''
 
+    ##########################################################################
+    # De brujin nodes
     def visitNVarRef(self, n):
         return f'${n.idx}'
 
@@ -91,16 +93,29 @@ else
         return f'${n.idx}.{n.sub}'
 
     def visitNLetRecArm(self, arm):
-        return f'LamArm {self(arm.argTy)} =\n{self._i(self(arm.val))}'
+        return f'LamArm \n{self._i(self(arm.val))}'
 
     def visitNLam(self, n):
         bodyStr = self(n.body)
-        res = f'Lam {self(n.ty)} ->'
+        res = f'Lam'
         if len(bodyStr) < 40 and '\n' not in bodyStr:
             return f'({res} {bodyStr})'
         else:
             return f'({res}\n{self._i(bodyStr)})'
 
+    def visitNLet(self, n):
+        valStr = self(n.val)
+        if len(valStr) < 15:
+            return f"""Let {valStr} in
+{self(n.body)}"""
+        else:
+            return f"""Let
+{self._i(valStr)}
+in
+{self(n.body)}"""
+
+    ##########################################################################
+    # Match nodes
     def visitMatch(self, n):
         armsStr = '\n'.join(self(arm) for arm in n.arms)
         return f"""match {self(n.expr)}

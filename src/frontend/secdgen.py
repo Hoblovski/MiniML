@@ -1,3 +1,7 @@
+"""
+Should be done after De brujin pass.
+"""
+
 from ..common import *
 from ..utils import *
 

@@ -4,3 +4,4 @@ from .ast import IndentedPrintVisitor, LISPStylePrintVisitor
 from .namer import NamerVisitor
 from .secdgen import SECDGenVisitor
 from .patmat import PatMatVisitor
+from .debrujin import DeBrujinVisitor

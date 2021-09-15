@@ -29,7 +29,7 @@ def doParseArgs(argv):
             '-f', '--format', choices={'lisp', 'indent', 'code'}, default='lisp',
             help='AST print format')
     parser.add_argument(
-            '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd', 'c', 'patmat'},
+            '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd', 'c', 'patmat', 'debrujin'},
             help='[Debug] print debug info for that stage')
     parser.add_argument(
             '-bt', '--backtrace', action='store_true',
@@ -86,6 +86,14 @@ def doNamer(ast):
     return ast
 
 
+def doDeBrujin(ast):
+    DeBrujinVisitor().visit(ast)
+    if args.stage == 'debrujin':
+        printAst(ast)
+        exit(0)
+    return ast
+
+
 def doSECD(ast):
     secd = SECDGenVisitor().visit(ast)
     if args.stage == 'secd':
@@ -106,6 +114,7 @@ def main(argv):
         cst = doParse(tokens)
         ast = doConstructAST(cst)
         ast = doNamer(ast)
+        ast = doDeBrujin(ast)
         secd = doSECD(ast)
         return 0
     except MiniMLError as e:
