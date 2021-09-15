@@ -8,8 +8,6 @@ For let-recs, they create 'grouped closures'.
 from .ast import *
 from .astnodes import *
 
-globals().update(createNodes(spec))
-
 class NamerVisitor(ASTVisitor):
     """
     Renaming process.

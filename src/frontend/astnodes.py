@@ -60,7 +60,7 @@ def createNodes(spec):
         classes[className] = nodeClass
     return classes
 
-spec = """
+globals().update(createNodes("""
 TyUnk                   :
 TyBase                  : name.
 TyLam                   : lhs rhs
@@ -80,6 +80,4 @@ VarRef                  : name.
 Tuple                   : subs+
 Builtin                 : name.
 Nth                     : idx. expr
-"""
-
-globals().update(createNodes(spec))
+"""))
