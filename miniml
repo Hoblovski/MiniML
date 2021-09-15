@@ -1,6 +1,11 @@
 #!python3
 import sys
+import os
+
 from src import main
 
-sys.exit(main(sys.argv))
+argv = sys.argv
+# TODO: os.environ.get('MINIMLFLAGS', '')
+
+sys.exit(main(argv))
 

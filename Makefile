@@ -3,17 +3,16 @@ i ?= i.ml
 o ?=
 e ?=
 LANGNAME = MiniML
-RUNCMD = python3 -m src $(EXTRA_ARGS)
 
 CLASSPATH = $(ANTLR_JAR):generated
 
 all: run
 
 help: grammar-py
-	$(RUNCMD) --help
+	echo "Deprecated. Use ./miniml -h directly"
 
 run: grammar-py
-	$(RUNCMD) $(i) $(o) $(e)
+	echo "Deprecated. Use ./miniml ARGS directly"
 
 cst: grammar-java
 	java -cp $(CLASSPATH) org.antlr.v4.gui.TestRig $(LANGNAME) top -gui $(i)
