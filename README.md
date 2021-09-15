@@ -38,10 +38,14 @@ If you see `ModuleNotFoundError: No module named 'src.generated'`, run `make gra
 
 # Architecture
 * MiniML
-* lexing parsing desugaring stuff
-* naming: uses de brujin representation
+* lexing parsing desugaring stuff with ANTLR
+* naming: just alpha conversion pass, make all names distinct.
+  - So we can use a flat dict for book-keeping.
 * [TODO] typing
+* [TODO] patmat (once done wrong in the past)
+* debrujin: convert to the nameless de brujin form for SECD emission
 * [RSECD](https://github.com/Hoblovski/RSECD-interp): stack based functional IR
+  - SECD with mutually recursive functions.
 * C transpiler: the generated C looks really like an interpreter script, but trust me it'll be compiled.
 
 # Features
@@ -62,6 +66,11 @@ Type system is good for correctness, but only a static one (not you python!).
 But dynamic languages saves me a lot of code (see `ast.py` and `astnodes.py` for how I avoid AST boilerplates).
 
 The interpreter is so slow... Maybe somewhere in python a careless list operation is taking O(n^2) time?
+
+Desugaring might be good for mathematicians but not for a working compiler.
+This is why we put patmat after namer/typer even though it could be before as a desugaring pass.
+
+De brujin form is very unstable. Even if necessary, delay the conversion into it.
 
 # Reference
 * [RSECD](https://github.com/Hoblovski/RSECD-interp)
