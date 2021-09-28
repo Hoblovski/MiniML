@@ -64,6 +64,7 @@ def createNodes(spec):
         classes[className] = nodeClass
     return classes
 
+# TODO TyTup                   : subs+# TODO
 globals().update(createNodes("""
 TyUnk                   :
 TyBase                  : name.

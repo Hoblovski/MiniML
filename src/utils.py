@@ -106,3 +106,13 @@ class stacked_dict:
 
 def noDuplicates(l):
     return len(set(l)) == len(l)
+
+def unreachable():
+    raise Exception('unreachable')
+
+def unionsets(l):
+    r = set()
+    for s in l:
+        assert isinstance(s, set)
+        r.update(s)
+    return r
