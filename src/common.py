@@ -18,6 +18,10 @@ LegalBrOps = {
         'br', 'brfl'
 }
 
+AllBaseTypes = {
+        'int', 'bool', 'unit'
+}
+
 relOpToStr = {
     '==': 'eq', '!=': 'ne', '>': 'gt',
     '<': 'lt', '>=': 'ge', '<=': 'le'

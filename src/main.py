@@ -29,7 +29,7 @@ def doParseArgs(argv):
             '-f', '--format', choices={'lisp', 'indent', 'code'}, default='lisp',
             help='AST print format')
     parser.add_argument(
-            '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd', 'c', 'patmat', 'debrujin'},
+            '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd', 'c', 'patmat', 'debrujin', 'typer'},
             help='[Debug] print debug info for that stage')
     parser.add_argument(
             '-bt', '--backtrace', action='store_true',
@@ -86,6 +86,14 @@ def doNamer(ast):
     return ast
 
 
+def doTyper(ast):
+    TyperVisitor().visit(ast)
+    UnifyVisitor().visit(ast)
+    if args.stage == 'typer':
+        print(TypedIndentedPrintVisitor()(ast), file=args.outfile)
+        exit(0)
+    return ast
+
 def doDeBrujin(ast):
     DeBrujinVisitor().visit(ast)
     if args.stage == 'debrujin':
@@ -114,6 +122,7 @@ def main(argv):
         cst = doParse(tokens)
         ast = doConstructAST(cst)
         ast = doNamer(ast)
+        ast = doTyper(ast)
         ast = doDeBrujin(ast)
         secd = doSECD(ast)
         return 0

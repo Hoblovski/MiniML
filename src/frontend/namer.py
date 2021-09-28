@@ -4,6 +4,8 @@ While SECD uses something like them, inside the miniML compiler we have named re
 
 Alpha conversion to make variables distinct.
 For let-recs, they create 'grouped closures'.
+
+TODO: when introducing type variables they ought to be renamed as well, in a different fashion from TypeVar.genFresh
 """
 from .ast import *
 from .astnodes import *
