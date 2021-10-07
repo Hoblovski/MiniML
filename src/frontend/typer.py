@@ -79,6 +79,34 @@ class LamType(Type):
     def freeTyVars(self):
         return self.lhs.freeTyVars() + self.rhs.freeTyVars()
 
+class TupleType(Type):
+    def __init__(self, *subs):
+        assert all(isinstance(t, Type) for t in subs)
+        self.subs = subs
+
+    def arity(self):
+        return len(self.subs)
+
+    def nth(self, n):
+        return self.subs[n]
+
+    def __str__(self):
+        return '(' + ', '.join([str(x) for x in self.subs]) + ')'
+
+    def __eq__(self, other):
+        if not isinstance(other, TupleType):
+            return False
+        return all(x == y for x, y in zip(self.subs, other.subs))
+
+    def __hash__(self):
+        return hash(self.subs)
+
+    def substTV(self, tvId, actualTy):
+        return TupleType(*[t.substTV(tvId, actualTy) for t in self.subs])
+
+    def substTVMap(self, tvMap):
+        return TupleType(*[t.substTVMap(tvMap) for t in self.subs])
+
 class TypeVar(Type):
     """
     genTypeVarName ensures that generated type variables are always unique.
@@ -266,7 +294,8 @@ class TyperVisitor(ASTVisitor):
 
     def visitTuple(self, n):
         self.visitChildren(n)
-        assert False
+        n.type = TupleType(*[sub.type for sub in n.subs])
+        n._constr = unionsets([sub._constr for sub in n.subs])
 
     def visitBuiltin(self, n):
         if n.name == 'println':
@@ -277,7 +306,16 @@ class TyperVisitor(ASTVisitor):
             unreachable()
 
     def visitNth(self, n):
-        assert False
+        # TODO: we're forbidding things like
+        #           let f = \x -> nth 1 x
+        #       by requiring n to be already defined type
+        self.visitChildren(n)
+        if not isinstance(n.expr.type, TupleType):
+            raise MiniMLLocatedError(n, 'typeck limitation: argument to nth must be of concrete type #TODO')
+        if n.idx >= n.expr.type.arity():
+            raise MiniMLLocatedError(n, f'cannot take {n.idx}-th element of {n.expr.type.arity()}-ary tuple (nth indices start from 0)')
+        n._constr = n.expr._constr
+        n.type = n.expr.type.nth(n.idx)
 
     def visitChildren(self, n):
         # pass down _Gamma
@@ -401,7 +439,6 @@ class UnifyVisitor(ASTVisitor):
 
     def visitNth(self, n):
         self.doTag(n)
-        assert False
 
 
 
@@ -412,14 +449,14 @@ class TypedIndentedPrintVisitor(ASTVisitor):
     def visitTermNode(self, n):
         ty = getattr(n, 'type', None)
         if ty is not None:
-            return [str(n.v), str(ty)]
+            return [' typer: ' + str(n.v), str(ty)]
         else:
             return [str(n.v)]
 
     def joinResults(self, n, chLines):
         ty = getattr(n, 'type', None)
         if ty is not None:
-            return [n.NodeName, str(ty)] + [self.INDENT + x for x in flatten(chLines)]
+            return [n.NodeName, ' typer: ' + str(ty)] + [self.INDENT + x for x in flatten(chLines)]
         else:
             return [n.NodeName] + [self.INDENT + x for x in flatten(chLines)]
 
