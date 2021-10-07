@@ -1,6 +1,8 @@
 """
 AST evolves and gets rewritten during compilation passe, defined thus in a
 custom fashion.
+
+Note we must guarantee NO ALIASING for ASTNodes as they ARE MUTABLE!!!
 """
 
 from ..utils import *

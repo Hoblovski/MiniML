@@ -57,11 +57,11 @@ class ConstructASTVisitor(MiniMLVisitor):
         return ctx.ptn().accept(self)
 
     def visitPtnBinder(self, ctx:MiniMLParser.PtnBinderContext):
-        return IdentPtnNode(ctx=ctx,
+        return PtnBinderNode(ctx=ctx,
                 name=text(ctx))
 
     def visitPtnTuple(self, ctx:MiniMLParser.PtnTupleContext):
-        return TuplePtnNode(ctx=ctx,
+        return PtnTupleNode(ctx=ctx,
                 subs=[ptn.accept(self) for ptn in ctx.ptn0()])
 
     def visitLam1(self, ctx:MiniMLParser.Lam1Context):

@@ -75,3 +75,16 @@ class NamerVisitor(ASTVisitor):
         self(n.val)
         self(n.body)
         self.undefVar(n.name)
+
+    def visitMatchArm(self, n):
+        ptnBinders = self(n.ptn)
+        self(n.expr)
+        for v in reversed(ptnBinders):
+            self.undefVar(v)
+
+    def visitPtnBinder(self, n):
+        n.name = self.defVar(n.name)
+        return [n.name]
+
+    def visitPtnTuple(self, n):
+        return joinlist([], [self(p) for p in n.subs])

@@ -19,7 +19,7 @@ def nodeClassFactory(className, nodeName, fieldNames,
     def initf(self, pos=None, ctx=None, **kwargs):
         # Python >=3.6 preserves order of kwargs
         if set(kwargs.keys()) != set(fieldNames):
-            raise MiniMLError(f'fields {fieldNames} expected, given {kwargs.keys()}')
+            raise MiniMLError(f'for {className}, fields {fieldNames} expected, given {kwargs.keys()}')
         # Set children (for traversal)
         pos = pos or ctxPos(ctx) or (-1, -1)
         for termf in termFields:
@@ -66,6 +66,8 @@ def createNodes(spec):
 
 # TODO TyTup                   : subs+# TODO
 globals().update(createNodes("""
+Null                    :
+
 TyUnk                   :
 TyBase                  : name.
 TyLam                   : lhs rhs
@@ -74,6 +76,10 @@ Top                     : expr
 Let                     : name.  ty  val  body
 LetRec                  : arms+  body
     LetRecArm           : name.  argName.  argTy  val
+Match                   : expr arms+
+    MatchArm            : ptn expr
+        PtnBinder       : name.
+        PtnTuple        : subs+
 Lam                     : name.  ty  body
 Seq                     : subs+
 Ite                     : cond  tr  fl

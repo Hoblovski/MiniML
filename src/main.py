@@ -29,7 +29,7 @@ def doParseArgs(argv):
             '-f', '--format', choices={'lisp', 'indent', 'code'}, default='lisp',
             help='AST print format')
     parser.add_argument(
-            '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd', 'c', 'patmat', 'debrujin', 'typer'},
+            '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd', 'c', 'patmat', 'debrujin', 'type'},
             help='[Debug] print debug info for that stage')
     parser.add_argument(
             '-bt', '--backtrace', action='store_true',
@@ -89,10 +89,11 @@ def doNamer(ast):
 def doTyper(ast):
     TyperVisitor().visit(ast)
     UnifyVisitor().visit(ast)
-    if args.stage == 'typer':
+    if args.stage == 'type':
         print(TypedIndentedPrintVisitor()(ast), file=args.outfile)
         exit(0)
     return ast
+
 
 def doDeBrujin(ast):
     DeBrujinVisitor().visit(ast)
@@ -117,13 +118,17 @@ def main(argv):
     try:
         global args
         args = doParseArgs(argv)
+        print('.')
         inputs = FileStream(args.infile)
         tokens = doLex(inputs)
         cst = doParse(tokens)
+        print('.')
         ast = doConstructAST(cst)
         ast = doNamer(ast)
-        ast = doTyper(ast)
+        #ast = doTyper(ast)
+        ast = doPatMat(ast)
         ast = doDeBrujin(ast)
+        print('.')
         secd = doSECD(ast)
         return 0
     except MiniMLError as e:
