@@ -88,7 +88,7 @@ def doNamer(ast):
 
 def doTyper(ast):
     TyperVisitor().visit(ast)
-    UnifyVisitor().visit(ast)
+    UnifyTagVisitor(ast._constr).visit(ast)
     if args.stage == 'type':
         print(TypedIndentedPrintVisitor()(ast), file=args.outfile)
         exit(0)

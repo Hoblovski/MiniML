@@ -53,12 +53,12 @@ class NamerVisitor(ASTVisitor):
         self.undefVar(n.name)
 
     def visitLetRec(self, n):
-        armNames = [arm.name for arm in n.arms]
+        armNames = [arm.fnName for arm in n.arms]
         if not noDuplicates(armNames):
             raise MiniMLError('duplicate names in let-rec')
 
         for arm in n.arms:
-            arm.name = self.defVar(arm.name)
+            arm.fnName = self.defVar(arm.fnName)
 
         for arm in n.arms:
             arm.argName = self.defVar(arm.argName)
@@ -68,7 +68,7 @@ class NamerVisitor(ASTVisitor):
         self(n.body)
 
         for arm in reversed(n.arms):
-            self.undefVar(arm.name)
+            self.undefVar(arm.fnName)
 
     def visitLet(self, n):
         n.name = self.defVar(n.name)

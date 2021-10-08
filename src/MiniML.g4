@@ -15,8 +15,7 @@ let
     ;
 
 letRecArm
-    : Ident Ident '=' expr
-    | Ident '(' Ident ':' ty ')' '=' expr
+    : Ident (':' t1=ty)? '=' '\\' Ident (':' t2=ty)? '->' expr
     ;
 
 mat

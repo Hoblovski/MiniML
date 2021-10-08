@@ -13,7 +13,7 @@ let factgen: (int -> int) -> (int -> int) = \post ->
     let zero = 0 in
     let step = 1 in
     let mul = \a: int -> \b: int -> a * b in
-    let rec fact (n : int) =
+    let rec fact = \n : int ->
         if n == zero then
             base
         else

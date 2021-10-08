@@ -35,9 +35,11 @@ class ConstructASTVisitor(MiniMLVisitor):
                 body=ctx.expr().accept(self))
 
     def visitLetRecArm(self, ctx:MiniMLParser.LetRecArmContext):
+        fnTy = TyUnkNode() if ctx.t1 is None else ctx.t1.accept(self)
+        argTy = TyUnkNode() if ctx.t2 is None else ctx.t2.accept(self)
         return LetRecArmNode(ctx=ctx,
-                name=text(ctx.Ident(0)), argName=text(ctx.Ident(1)),
-                argTy=_acceptMaybeTy(ctx, self), val=ctx.expr().accept(self))
+                fnName=text(ctx.Ident(0)), argName=text(ctx.Ident(1)),
+                fnTy=fnTy, argTy=argTy, val=ctx.expr().accept(self))
 
     def visitLet2(self, ctx:MiniMLParser.Let2Context):
         # Desugar: let X: T = E0 in E1  =>   (\\X:T -> E1)(E0)

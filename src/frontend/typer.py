@@ -17,12 +17,13 @@ class Type:
     def __repr__(self):
         return str(self)
 
-    def substTV(self, tvId, actualTy):
-        raise MiniMLError('unimplemented substTV')
+    def subst(self, tvId, ty):
+        raise MiniMLError('unimplemented subst')
 
-    def substTVMap(self, tvMap):
-        raise MiniMLError('unimplemented substTVMap')
+    def substMap(self, tvMap):
+        raise MiniMLError('unimplemented substMap')
 
+    # Do we need this?
     def freeTyVars(self):
         raise MiniMLError('unimplemented freeTyVars')
 
@@ -30,7 +31,7 @@ class Type:
 
 class BaseType(Type):
     def __init__(self, name):
-        #assert name in AllBaseTypes
+        assert name in AllBaseTypes
         self.name = name
 
     def __str__(self):
@@ -42,10 +43,10 @@ class BaseType(Type):
     def __hash__(self):
         return hash(self.name)
 
-    def substTV(self, tvId, actualTy):
+    def subst(self, tvId, ty):
         return self
 
-    def substTVMap(self, tvMap):
+    def substMap(self, tvMap):
         return self
 
     def freeTyVars(self):
@@ -66,14 +67,14 @@ class LamType(Type):
     def __hash__(self):
         return hash((self.lhs, self.rhs))
 
-    def substTV(self, tvId, actualTy):
-        lhs_ = self.lhs.substTV(tvId, actualTy)
-        rhs_ = self.rhs.substTV(tvId, actualTy)
+    def subst(self, tvId, ty):
+        lhs_ = self.lhs.subst(tvId, ty)
+        rhs_ = self.rhs.subst(tvId, ty)
         return LamType(lhs_, rhs_)
 
-    def substTVMap(self, tvMap):
-        lhs_ = self.lhs.substTVMap(tvMap)
-        rhs_ = self.rhs.substTVMap(tvMap)
+    def substMap(self, tvMap):
+        lhs_ = self.lhs.substMap(tvMap)
+        rhs_ = self.rhs.substMap(tvMap)
         return LamType(lhs_, rhs_)
 
     def freeTyVars(self):
@@ -101,11 +102,11 @@ class TupleType(Type):
     def __hash__(self):
         return hash(self.subs)
 
-    def substTV(self, tvId, actualTy):
-        return TupleType(*[t.substTV(tvId, actualTy) for t in self.subs])
+    def subst(self, tvId, ty):
+        return TupleType(*[t.subst(tvId, ty) for t in self.subs])
 
-    def substTVMap(self, tvMap):
-        return TupleType(*[t.substTVMap(tvMap) for t in self.subs])
+    def substMap(self, tvMap):
+        return TupleType(*[t.substMap(tvMap) for t in self.subs])
 
 class TypeVar(Type):
     """
@@ -141,16 +142,14 @@ class TypeVar(Type):
     def __str__(self):
         return f"'{self.id}"
 
-    def substTV(self, tvId, actualTy):
+    def subst(self, tvId, ty):
         if tvId == self.id:
-            return actualTy
+            return ty
         else:
             return self
 
-    def substTVMap(self, tvMap):
+    def substMap(self, tvMap):
         return tvMap.get(self.id, self)
-
-    # TODO: free tv?
 
 class MiniMLTypeMismatchError(MiniMLLocatedError):
     def __init__(self, n, expected, actual, msg=None):
@@ -160,6 +159,25 @@ class MiniMLTypeMismatchError(MiniMLLocatedError):
 class MiniMLTypeUnifyError(MiniMLLocatedError):
     def __init__(self, lhs, rhs):
         super().__init__(n, f'cannot unify {lhs} with {rhs}')
+
+
+class TypeConstr:
+    def isValid(self):
+        """
+        Is this Constr always True? i.e. Useless tautology?
+        """
+        raise MiniMLError('unimplemented isValid')
+
+class TypeConstrEq(TypeConstr):
+    def __init__(self, lhs, rhs):
+        self.lhs = lhs
+        self.rhs = rhs
+
+    def isValid(self):
+        return self.lhs == self.rhs
+
+    def subst(self, tvId, ty):
+        return TypeConstrEq(self.lhs.subst(tvId, ty), self.rhs.subst(tvId, ty))
 
 class TyperVisitor(ASTVisitor):
     """
@@ -219,7 +237,7 @@ class TyperVisitor(ASTVisitor):
         n.body._tenv = deepcopy(n._tenv)
         n.body._tenv[n.name] = n.val.type
         self(n.body)
-        c1 = (n.ty.type, n.val.type)
+        c1 = TypeConstrEq(n.ty.type, n.val.type)
         n.type = n.body.type
         n._constr = n.val._constr | n.body._constr | {c1}
 
@@ -227,6 +245,9 @@ class TyperVisitor(ASTVisitor):
         assert False
 #LetRec                  : arms+  body
 #    LetRecArm           : name.  argName.  argTy  val
+
+    def visitLetRecArm(self, n):
+        assert False
 
     def visitLam(self, n):
         self(n.ty)
@@ -244,8 +265,8 @@ class TyperVisitor(ASTVisitor):
     def visitIte(self, n):
         self.visitChildren(n)
         n.type = n.tr.type
-        c1 = (n.cond.type, BaseType('bool'))
-        c2 = (n.tr.type, n.fl.type)
+        c1 = TypeConstrEq(n.cond.type, BaseType('bool'))
+        c2 = TypeConstrEq(n.tr.type, n.fl.type)
         n._constr = n.cond._constr | n.tr._constr | n.fl._constr | {c1, c2}
 
     def visitBinOp(self, n):
@@ -254,28 +275,28 @@ class TyperVisitor(ASTVisitor):
         if n.op in {'==', '!='}:
             n.type = BaseType('bool')
             # TODO: lam types are not compariable
-            c = (n.lhs.type, n.rhs.type)
+            c = TypeConstrEq(n.lhs.type, n.rhs.type)
             n._constr = n.lhs._constr | n.rhs._constr | {c}
             return
 
         lhsTy, rhsTy, resTy = TyperVisitor.BinOpRules[n.op]
         n.type = resTy
-        cl = (n.lhs.type, lhsTy)
-        cr = (n.rhs.type, rhsTy)
+        cl = TypeConstrEq(n.lhs.type, lhsTy)
+        cr = TypeConstrEq(n.rhs.type, rhsTy)
         n._constr = n.lhs._constr | n.rhs._constr | {cl, cr}
 
     def visitUnaOp(self, n):
         self.visitChildren(n)
         subTy, resTy = TyperVisitor.UnaOpRules[n.op]
         n.type = resTy
-        c = (n.sub.type, subTy)
+        c = TypeConstrEq(n.sub.type, subTy)
         n._constr = n.sub._constr | {c}
 
     def visitApp(self, n):
         self.visitChildren(n)
         resTV = TypeVar.genFresh()
         n.type = resTV
-        c = (n.fn.type, LamType(n.arg.type, resTV))
+        c = TypeConstrEq(n.fn.type, LamType(n.arg.type, resTV))
         n._constr = n.fn._constr | n.arg._constr | {c}
 
     def visitLit(self, n):
@@ -309,6 +330,9 @@ class TyperVisitor(ASTVisitor):
         # TODO: we're forbidding things like
         #           let f = \x -> nth 1 x
         #       by requiring n to be already defined type
+        #
+        #       Theoretically it's possible but let's leave it to dependent typing.
+        #       Because essentially  nth  is (variably) dependently typed.
         self.visitChildren(n)
         if not isinstance(n.expr.type, TupleType):
             raise MiniMLLocatedError(n, 'typeck limitation: argument to nth must be of concrete type #TODO')
@@ -332,16 +356,16 @@ class TyperVisitor(ASTVisitor):
 
 
 
-class UnifyVisitor(ASTVisitor):
+class UnifyTagVisitor(ASTVisitor):
     """
     Does unification and tagging types.
 
     Nodes are annotated with fields
-        _tenv:          deleted
+        _tenv           deleted
         _constr         deleted
-        type
+        type            the inferred type
     """
-    VisitorName = 'Unify'
+    VisitorName = 'UnifyTag'
 
     def unify(_constrs):
         tvMap = {}
@@ -350,96 +374,52 @@ class UnifyVisitor(ASTVisitor):
         while constrs != []:
             newConstrs = []
 
-            # 1. break lambdas
-            for lhs, rhs in constrs:
-                if lhs == rhs:
-                    continue
-                if isinstance(lhs, LamType) and isinstance(rhs, LamType):
-                    newConstrs += [(lhs.lhs, rhs.lhs), (lhs.rhs, rhs.rhs)]
-                    continue
-                newConstrs += [(lhs, rhs)]
-            constrs = [(lhs, rhs) for lhs, rhs in newConstrs if lhs != rhs]
+            # 1. break lambdas, tuples etc.
+            constrs = [c for c in constrs if not c.isValid()] # filter out all tautologies
+            if constrs == []:
+                break
+            for c in constrs:
+                if isinstance(c, TypeConstrEq):
+                    if isinstance(c.lhs, LamType) and isinstance(c.rhs, LamType):
+                        c1 = TypeConstrEq(c.lhs.lhs, c.rhs.lhs)
+                        c2 = TypeConstrEq(c.lhs.rhs, c.rhs.rhs)
+                        newConstrs += [c1, c2]
+                        continue
+                newConstrs += [c]
+            constrs = newConstrs
+
+            # 2. find a resolved type variable (OPT: multiple at once)
+            constrs = [c for c in constrs if not c.isValid()] # filter out all tautologies
+            if constrs == []:
+                break
+            substTvId, substTy = None, None
+            for c in constrs:
+                if isinstance(c, TypeConstrEq):
+                    if isinstance(c.lhs, TypeVar):
+                        substTvId, substTy = c.lhs.id, c.rhs
+                        break
+                    if isinstance(c.rhs, TypeVar):
+                        substTvId, substTy = c.rhs.id, c.lhs
+                        break
+            else:
+                raise MiniMLError('unification failed: no trivial varsubst')
+            tvMap[substTvId] = substTy
+
+            # 3. apply the substitution
+            constrs = [c.subst(substTvId, substTy) for c in constrs]
+            constrs = [c for c in constrs if not c.isValid()] # filter out all tautologies
             if constrs == []:
                 break
 
-            # 2. find a nontrivial variable substitution (OPT: multiple at once)
-            tyKey, tyVal = None, None
-            for lhs, rhs in constrs:
-                if isinstance(lhs, TypeVar):
-                    tyKey, tyVal = lhs.id, rhs
-                    break
-                if isinstance(rhs, TypeVar):
-                    tyKey, tyVal = rhs.id, lhs
-                    break
-            else:
-                raise MiniMLError('unification failed: no trivial varsubst')
-            tvMap[tyKey] = tyVal
-
-            # 3. apply the substitution
-            constrs = [(lhs.substTV(tyKey, tyVal), rhs.substTV(tyKey, tyVal))
-                    for lhs, rhs in constrs]
-            constrs = [(lhs, rhs) for lhs, rhs in constrs if lhs != rhs]
-
         return tvMap
 
-    def doTag(self, n):
+    def __init__(self, constrs):
+        self.tvMap = UnifyTagVisitor.unify(constrs)
+
+    def visit(self, n):
         if hasattr(n, 'type'):
-            n.type = n.type.substTVMap(self.tvMap)
-            #del n._tenv, n._constr
-        self.visitChildren(n)
-
-    def visitTop(self, n):
-        self.tvMap = UnifyVisitor.unify(n._constr)
-        self.doTag(n)
-
-    def visitTyUnk(self, n):
-        self.doTag(n)
-
-    def visitTyBase(self, n):
-        self.doTag(n)
-
-    def visitTyLam(self, n):
-        self.doTag(n)
-
-    def visitLet(self, n):
-        self.doTag(n)
-
-    def visitLetRec(self, n):
-        self.doTag(n)
-
-    def visitLam(self, n):
-        self.doTag(n)
-
-    def visitSeq(self, n):
-        self.doTag(n)
-
-    def visitIte(self, n):
-        self.doTag(n)
-
-    def visitBinOp(self, n):
-        self.doTag(n)
-
-    def visitUnaOp(self, n):
-        self.doTag(n)
-
-    def visitApp(self, n):
-        self.doTag(n)
-
-    def visitLit(self, n):
-        self.doTag(n)
-
-    def visitVarRef(self, n):
-        self.doTag(n)
-
-    def visitTuple(self, n):
-        self.doTag(n)
-
-    def visitBuiltin(self, n):
-        self.doTag(n)
-
-    def visitNth(self, n):
-        self.doTag(n)
-
+            n.type = n.type.substMap(self.tvMap)
+        ASTVisitor.visit(self, n)
 
 
 class TypedIndentedPrintVisitor(ASTVisitor):

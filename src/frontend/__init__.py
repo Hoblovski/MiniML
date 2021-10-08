@@ -5,4 +5,4 @@ from .namer import NamerVisitor
 from .secdgen import SECDGenVisitor
 from .patmat import PatMatVisitor
 from .debrujin import DeBrujinVisitor
-from .typer import TyperVisitor, TypedIndentedPrintVisitor, UnifyVisitor
+from .typer import TyperVisitor, TypedIndentedPrintVisitor, UnifyTagVisitor

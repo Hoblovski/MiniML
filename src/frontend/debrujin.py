@@ -53,7 +53,7 @@ class DeBrujinVisitor(ASTTransformer):
         return new
 
     def visitLetRec(self, n):
-        self.pushVar(tuple(arm.name for arm in n.arms))
+        self.pushVar(tuple(arm.fnName for arm in n.arms))
         for i, arm in enumerate(n.arms):
             self.pushVar(arm.argName)
             n.arms[i] = NLetRecArmNode(pos=arm.pos, val=self(arm.val))

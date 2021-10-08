@@ -75,7 +75,7 @@ TyLam                   : lhs rhs
 Top                     : expr
 Let                     : name.  ty  val  body
 LetRec                  : arms+  body
-    LetRecArm           : name.  argName.  argTy  val
+    LetRecArm           : fnName.  fnTy  argName.  argTy  val
 Match                   : expr arms+
     MatchArm            : ptn expr
         PtnBinder       : name.

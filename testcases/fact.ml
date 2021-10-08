@@ -1,4 +1,4 @@
-let rec fact (n : int) =
+let rec fact = \n : int ->
     if n == 0 then
         1
     else
