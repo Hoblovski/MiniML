@@ -29,7 +29,13 @@ class Type:
     def freeTyVars(self):
         raise MiniMLError('unimplemented freeTyVars')
 
-    pass
+    # PartialEq
+    def __eq__(self, other):
+        raise MiniMLError('unimplemented Type.__eq__')
+
+    # Actually __ne__ but this name is more informative.
+    def unableToUnify(self, other):
+        raise MiniMLError('unimplemented Type.unableToUnify')
 
 class BaseType(Type):
     def __init__(self, name):
@@ -53,6 +59,9 @@ class BaseType(Type):
 
     def freeTyVars(self):
         return []
+
+    def unableToUnify(self, other):
+        return not (isinstance(other, TypeVar) or self == other)
 
 class LamType(Type):
     def __init__(self, lhs, rhs):
@@ -82,6 +91,9 @@ class LamType(Type):
     def freeTyVars(self):
         return self.lhs.freeTyVars() + self.rhs.freeTyVars()
 
+    def unableToUnify(self, other):
+        return not (isinstance(other, TypeVar) or self == other)
+
 class TupleType(Type):
     def __init__(self, *subs):
         assert all(isinstance(t, Type) for t in subs)
@@ -99,7 +111,7 @@ class TupleType(Type):
     def __eq__(self, other):
         if not isinstance(other, TupleType):
             return False
-        return all(x == y for x, y in zip(self.subs, other.subs))
+        return self.arity() == other.arity() and all(x == y for x, y in zip(self.subs, other.subs))
 
     def __hash__(self):
         return hash(self.subs)
@@ -109,6 +121,10 @@ class TupleType(Type):
 
     def substMap(self, tvMap):
         return TupleType(*[t.substMap(tvMap) for t in self.subs])
+
+    def unableToUnify(self, other):
+        return not (isinstance(other, TypeVar) or self == other)
+
 
 class TypeVar(Type):
     """
@@ -152,6 +168,9 @@ class TypeVar(Type):
 
     def substMap(self, tvMap):
         return tvMap.get(self.id, self)
+
+    def unableToUnify(self, other):
+        return False
 
 class MiniMLTypeMismatchError(MiniMLLocatedError):
     def __init__(self, n, expected, actual, msg=None):
@@ -197,7 +216,7 @@ class TyperVisitor(ASTVisitor):
         _constr         :: up.
                            type constraints are either
                             (T1, T2):   T1 = T2
-                            TODO isNotLam T
+                            TODO Richer constraints like `isNotLam T`
         type            :: up
     """
     VisitorName = 'Typer'
@@ -371,6 +390,38 @@ class TyperVisitor(ASTVisitor):
         n._constr = n.expr._constr
         n.type = n.expr.type.nth(n.idx)
 
+    def visitMatch(self, n):
+        n.expr._tenv = n._tenv
+        self(n.expr)
+        resTy = TypeVar.genFresh()
+        n.type = resTy
+        constrs = n.expr._constr
+
+        for arm in n.arms:
+            ty, tenv = self(arm.ptn)
+            arm.expr._tenv = deepcopy(n._tenv)
+            arm.expr._tenv.update(tenv)
+            self(arm.expr)
+            c1 = TypeConstrEq(arm.expr.type, resTy)
+            c2 = TypeConstrEq(ty, n.expr.type)
+            constrs = constrs + arm.expr._constr + [c1, c2]
+
+        n._constr = constrs
+
+    def visitPtnBinder(self, n):
+        # visiting patterns return  ty, tenv
+        ty = TypeVar.genFresh()
+        tenv = { n.name: ty }
+        n.type = ty
+        return ty, tenv
+
+    def visitPtnTuple(self, n):
+        tys, tenvs = list(unzip(self(s) for s in n.subs))
+        tenv = joindict(tenvs)
+        ty = TupleType(*tys)
+        n.type = ty
+        return ty, tenv
+
     def visitChildren(self, n):
         # pass down _Gamma
         res = []
@@ -420,6 +471,15 @@ class UnifyTagVisitor(ASTVisitor):
                         c2 = TypeConstrEq(c.lhs.rhs, c.rhs.rhs)
                         newConstrs += [c1, c2]
                         continue
+                    if isinstance(c.lhs, TupleType) and isinstance(c.rhs, TupleType):
+                        if c.lhs.arity() != c.rhs.arity():
+                            raise MiniMLError(f'tuple arity dismatch: cannot unify {c.lhs} with {c.rhs}')
+                        newCs = [TypeConstrEq(x, y) for x, y in zip(c.lhs.subs, c.rhs.subs)]
+                        newConstrs += newCs
+                        continue
+                    if c.lhs.unableToUnify(c.rhs):
+                        raise MiniMLError(f'cannot unify {c.lhs} with {c.rhs}')
+
                 newConstrs += [c]
             constrs = newConstrs
 
