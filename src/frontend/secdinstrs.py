@@ -85,7 +85,17 @@ BinaryInstr.fmtSECD = lambda self: binOpToStr[self.op]
 UnaryInstr.fmtSECD = lambda self: unaOpToStr[self.op]
 LabelInstr.fmtSECD = lambda self: f'\n  {self.name}:'
 BranchInstr.fmtSECD = lambda self: f'{self.op} {self.lbl}'
-ConstInstr.fmtC = lambda self: f'Iconstint({self.val});' # FIXME
+
+def constFmtC(self):
+    if type(self.val) is int:
+        return f'Iconstint({self.val});'
+    elif self.val == ():
+        return f'Iconstint(0);'
+    elif type(self.val) is bool:
+        return f'Iconstint({1 if self.val else 0});'
+    else:
+        unreachable()
+ConstInstr.fmtC = constFmtC
 
 
 def branchFmtC(self):

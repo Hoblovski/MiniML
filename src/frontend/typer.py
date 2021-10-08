@@ -349,11 +349,14 @@ class TyperVisitor(ASTVisitor):
         n._constr = n.fn._constr + n.arg._constr + [c]
 
     def visitLit(self, n):
-        if isinstance(n.val, int):
+        if type(n.val) is int:
             n.type = BaseType('int')
             n._constr = []
         elif n.val == ():
             n.type = BaseType('unit')
+            n._constr = []
+        elif type(n.val) == bool: # fuck you python for bool <: int
+            n.type = BaseType('bool')
             n._constr = []
         else:
             unreachable()

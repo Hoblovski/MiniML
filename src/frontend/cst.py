@@ -106,17 +106,9 @@ class ConstructASTVisitor(MiniMLVisitor):
         return AppNode(ctx=ctx,
                 fn=ctx.app().accept(self), arg=ctx.atom().accept(self))
 
-    def visitAtomUnit(self, ctx:MiniMLParser.AtomUnitContext):
-        return LitNode(ctx=ctx,
-                val=())
-
     def visitAtomTuple(self, ctx:MiniMLParser.AtomTupleContext):
         return TupleNode(ctx=ctx,
                 subs=[expr.accept(self) for expr in ctx.expr()])
-
-    def visitLitInt(self, ctx:MiniMLParser.LitIntContext):
-        return LitNode(ctx=ctx,
-                val=int(text(ctx)))
 
     def visitAtomIdent(self, ctx:MiniMLParser.AtomIdentContext):
         return VarRefNode(ctx=ctx,
@@ -136,6 +128,18 @@ class ConstructASTVisitor(MiniMLVisitor):
         return NthNode(ctx=ctx,
                 idx=int(text(ctx.Integer())),
                 expr=ctx.atom().accept(self))
+
+    def visitLitInt(self, ctx:MiniMLParser.LitIntContext):
+        return LitNode(ctx=ctx,
+                val=int(text(ctx)))
+
+    def visitLitUnit(self, ctx:MiniMLParser.LitUnitContext):
+        return LitNode(ctx=ctx,
+                val=())
+
+    def visitLitBool(self, ctx:MiniMLParser.LitUnitContext):
+        return LitNode(ctx=ctx,
+                val=False if text(ctx) == 'false' else True)
 
     def visitTyInt(self, ctx:MiniMLParser.TyIntContext):
         return TyBaseNode(ctx=ctx,

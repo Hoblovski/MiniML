@@ -77,8 +77,7 @@ app
     ;
 
 atom
-    : '(' ')'                  # atomUnit
-    | '(' expr (',' expr)+ ')' # atomTuple
+    : '(' expr (',' expr)+ ')' # atomTuple
     | lit                      # atomLit
     | Ident                    # atomIdent
     | '(' expr ')'             # atomParen
@@ -87,7 +86,9 @@ atom
     ;
 
 lit
-    : Integer # litInt
+    : Integer                  # litInt
+    | '(' ')'                  # litUnit
+    | ('false' | 'true')       # litBool
     ;
 
 ty
