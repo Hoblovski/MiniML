@@ -1,6 +1,8 @@
 from copy import deepcopy
 from antlr4 import *
 from ast import literal_eval
+from pprint import pprint
+
 
 class MiniMLError(Exception):
     def __init__(self, *args, **kwargs):

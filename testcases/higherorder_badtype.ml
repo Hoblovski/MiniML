@@ -4,7 +4,7 @@ let dot: (int -> int) -> (int -> int) -> (int -> int) =
     \f -> \g -> \x -> f (g x)
 in
 
-let dollar: ((int -> int) -> (int -> int)) -> (int -> int) -> (int -> int) =
+let dollar: (int -> int) -> int -> int =
     \f -> \x -> f x
 in
 
@@ -29,7 +29,7 @@ let factp1 = factgen (\x -> x+1)
 in
 
 let builtinf = println in
--- the let polymorphism problem
+
 builtinf (builtinf (dollar fact 0) ) ;
 builtinf (dollar fact 7) ;
 builtinf (dollar factp1 3) ;

@@ -125,7 +125,7 @@ def main(argv):
         print('.')
         ast = doConstructAST(cst)
         ast = doNamer(ast)
-        #ast = doTyper(ast)
+        ast = doTyper(ast)
         ast = doPatMat(ast)
         ast = doDeBrujin(ast)
         print('.')

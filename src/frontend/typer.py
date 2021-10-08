@@ -12,6 +12,8 @@ from ..common import *
 from .ast import *
 from .astnodes import *
 
+_DEBUG_PRINT_CONSTRS = False
+_DEBUG_PRINT_TVMAP = False
 
 class Type:
     def __repr__(self):
@@ -162,6 +164,7 @@ class MiniMLTypeUnifyError(MiniMLLocatedError):
 
 
 class TypeConstr:
+    # TODO: introduce location information?
     def isValid(self):
         """
         Is this Constr always True? i.e. Useless tautology?
@@ -172,6 +175,12 @@ class TypeConstrEq(TypeConstr):
     def __init__(self, lhs, rhs):
         self.lhs = lhs
         self.rhs = rhs
+
+    def __str__(self):
+        return f'{str(self.lhs):<40}=={str(self.rhs):<40}'
+
+    def __repr__(self):
+        return str(self)
 
     def isValid(self):
         return self.lhs == self.rhs
@@ -219,18 +228,20 @@ class TyperVisitor(ASTVisitor):
 
     def visitTyUnk(self, n):
         n.type = TypeVar.genFresh()
-        n._constr = set()
+        n._constr = []
 
     def visitTyBase(self, n):
         n.type = BaseType(n.name)
-        n._constr = set()
+        n._constr = []
 
     def visitTyLam(self, n):
         self.visitChildren(n)
         n.type = LamType(n.lhs.type, n.rhs.type)
-        n._constr = set()
+        n._constr = []
 
     def visitLet(self, n):
+        # TODO: let-polymorphism
+        n.ty._tenv = n._tenv
         self(n.ty)
         n.val._tenv = n._tenv
         self(n.val)
@@ -239,17 +250,36 @@ class TyperVisitor(ASTVisitor):
         self(n.body)
         c1 = TypeConstrEq(n.ty.type, n.val.type)
         n.type = n.body.type
-        n._constr = n.val._constr | n.body._constr | {c1}
+        n._constr = n.val._constr + n.body._constr + [c1]
 
     def visitLetRec(self, n):
-        assert False
-#LetRec                  : arms+  body
-#    LetRecArm           : name.  argName.  argTy  val
-
-    def visitLetRecArm(self, n):
-        assert False
+        constrs = []
+        tenv = deepcopy(n._tenv)
+        armResTys = []
+        # 1. declare all arms before going into their body
+        for arm in n.arms:
+            self(arm.fnTy)
+            self(arm.argTy)
+            armResTy = TypeVar.genFresh()
+            c = TypeConstrEq(arm.fnTy.type, LamType(arm.argTy.type, armResTy))
+            constrs = constrs + [c]
+            tenv[arm.fnName] = arm.fnTy.type
+            armResTys += [armResTy]
+        # 2. type the arm bodies
+        for armResTy, arm in zip(armResTys, n.arms):
+            arm.val._tenv = deepcopy(tenv)
+            arm.val._tenv[arm.argName] = arm.argTy.type
+            self(arm.val)
+            c = TypeConstrEq(arm.val.type, armResTy)
+            constrs = constrs + arm.val._constr + [c]
+        # 3. type the let body
+        n.body._tenv = tenv
+        self(n.body)
+        n._constr = n.body._constr + constrs
+        n.type = n.body.type
 
     def visitLam(self, n):
+        n.ty._tenv = n._tenv
         self(n.ty)
         n.body._tenv = deepcopy(n._tenv)
         n.body._tenv[n.name] = n.ty.type
@@ -260,14 +290,14 @@ class TyperVisitor(ASTVisitor):
     def visitSeq(self, n):
         self.visitChildren(n)
         n.type = n.subs[-1].type
-        n._constr = unionsets([ch._constr for ch in n.subs])
+        n._constr = joinlist([], [ch._constr for ch in n.subs])
 
     def visitIte(self, n):
         self.visitChildren(n)
         n.type = n.tr.type
         c1 = TypeConstrEq(n.cond.type, BaseType('bool'))
         c2 = TypeConstrEq(n.tr.type, n.fl.type)
-        n._constr = n.cond._constr | n.tr._constr | n.fl._constr | {c1, c2}
+        n._constr = n.cond._constr + n.tr._constr + n.fl._constr + [c1, c2]
 
     def visitBinOp(self, n):
         self.visitChildren(n)
@@ -276,53 +306,53 @@ class TyperVisitor(ASTVisitor):
             n.type = BaseType('bool')
             # TODO: lam types are not compariable
             c = TypeConstrEq(n.lhs.type, n.rhs.type)
-            n._constr = n.lhs._constr | n.rhs._constr | {c}
+            n._constr = n.lhs._constr + n.rhs._constr + [c]
             return
 
         lhsTy, rhsTy, resTy = TyperVisitor.BinOpRules[n.op]
         n.type = resTy
         cl = TypeConstrEq(n.lhs.type, lhsTy)
         cr = TypeConstrEq(n.rhs.type, rhsTy)
-        n._constr = n.lhs._constr | n.rhs._constr | {cl, cr}
+        n._constr = n.lhs._constr + n.rhs._constr + [cl, cr]
 
     def visitUnaOp(self, n):
         self.visitChildren(n)
         subTy, resTy = TyperVisitor.UnaOpRules[n.op]
         n.type = resTy
         c = TypeConstrEq(n.sub.type, subTy)
-        n._constr = n.sub._constr | {c}
+        n._constr = n.sub._constr + [c]
 
     def visitApp(self, n):
         self.visitChildren(n)
         resTV = TypeVar.genFresh()
         n.type = resTV
         c = TypeConstrEq(n.fn.type, LamType(n.arg.type, resTV))
-        n._constr = n.fn._constr | n.arg._constr | {c}
+        n._constr = n.fn._constr + n.arg._constr + [c]
 
     def visitLit(self, n):
         if isinstance(n.val, int):
             n.type = BaseType('int')
-            n._constr = set()
+            n._constr = []
         elif n.val == ():
             n.type = BaseType('unit')
-            n._constr = set()
+            n._constr = []
         else:
             unreachable()
 
     def visitVarRef(self, n):
         n.type = n._tenv[n.name]
-        n._constr = set()
+        n._constr = []
 
     def visitTuple(self, n):
         self.visitChildren(n)
         n.type = TupleType(*[sub.type for sub in n.subs])
-        n._constr = unionsets([sub._constr for sub in n.subs])
+        n._constr = joinlist([], [sub._constr for sub in n.subs])
 
     def visitBuiltin(self, n):
         if n.name == 'println':
             argTV = TypeVar.genFresh()
             n.type = LamType(argTV, BaseType('unit'))
-            n._constr = set()
+            n._constr = []
         else:
             unreachable()
 
@@ -372,6 +402,11 @@ class UnifyTagVisitor(ASTVisitor):
 
         constrs = _constrs
         while constrs != []:
+            if _DEBUG_PRINT_CONSTRS:
+                print('='*70)
+                print('Constrs:')
+                pprint(constrs)
+                print(':Constrs')
             newConstrs = []
 
             # 1. break lambdas, tuples etc.
@@ -387,6 +422,12 @@ class UnifyTagVisitor(ASTVisitor):
                         continue
                 newConstrs += [c]
             constrs = newConstrs
+
+            if _DEBUG_PRINT_CONSTRS:
+                print('-'*70)
+                print('Constrs:')
+                pprint(constrs)
+                print(':Constrs')
 
             # 2. find a resolved type variable (OPT: multiple at once)
             constrs = [c for c in constrs if not c.isValid()] # filter out all tautologies
@@ -404,12 +445,23 @@ class UnifyTagVisitor(ASTVisitor):
             else:
                 raise MiniMLError('unification failed: no trivial varsubst')
             tvMap[substTvId] = substTy
+            if _DEBUG_PRINT_CONSTRS:
+                print('='*70)
+                print(f'{str(substTvId):<30} => {str(substTy):<30}')
+            # todo check: panic if    free(substTy).contains(substTvId)
 
             # 3. apply the substitution
+            #    note the substitution need be applied to tvMap as well
+            #    as tvMap is a specific trivial form of constraint
             constrs = [c.subst(substTvId, substTy) for c in constrs]
+            for tvId, ty in tvMap.items():
+                tvMap[tvId] = ty.subst(substTvId, substTy)
             constrs = [c for c in constrs if not c.isValid()] # filter out all tautologies
             if constrs == []:
                 break
+
+        if _DEBUG_PRINT_TVMAP:
+            print(tvMap)
 
         return tvMap
 
@@ -429,14 +481,14 @@ class TypedIndentedPrintVisitor(ASTVisitor):
     def visitTermNode(self, n):
         ty = getattr(n, 'type', None)
         if ty is not None:
-            return [' typer: ' + str(n.v), str(ty)]
+            return ['* typer: ' + str(n.v), str(ty)]
         else:
             return [str(n.v)]
 
     def joinResults(self, n, chLines):
         ty = getattr(n, 'type', None)
         if ty is not None:
-            return [n.NodeName, ' typer: ' + str(ty)] + [self.INDENT + x for x in flatten(chLines)]
+            return [n.NodeName, '* typer: ' + str(ty)] + [self.INDENT + x for x in flatten(chLines)]
         else:
             return [n.NodeName] + [self.INDENT + x for x in flatten(chLines)]
 
