@@ -8,7 +8,7 @@ class MiniMLError(Exception):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, *kwargs)
 
-class MiniMLLocatedError(Exception):
+class MiniMLLocatedError(MiniMLError):
     def __init__(self, n, msg):
         self.msg = f'At {n.pos[0]}, {n.pos[1]}: {msg}'
 
@@ -118,3 +118,12 @@ def unionsets(l):
         assert isinstance(s, set)
         r.update(s)
     return r
+
+def unzip(iterable):
+    return zip(*iterable)
+
+def joindict(iterable):
+    res = deepcopy(iterable[0])
+    for it in iterable[1:]:
+        res.update(it)
+    return res
