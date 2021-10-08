@@ -58,7 +58,7 @@ Translation scheme:
     ```
         ptn2lam( @i -> r )
         =
-        \\i -> (OK, r)
+        \\i -> (OK, r)      where i could occur freely in r
     ```
 
     When p is a constant pattern
@@ -177,6 +177,19 @@ class PatMatVisitor(ASTTransformer):
                     name=ptn.name,
                     ty=NullNode(),
                     body=ok(rhs))
+
+        if isinstance(ptn, PtnLitNode):
+            x_name = self.genName('x')
+
+            cont = IteNode(
+                    cond=BinOpNode(lhs=_v(x_name), op='==', rhs=ptn.expr),
+                    tr=ok(rhs),
+                    fl=err())
+            cont = LamNode(
+                    name=x_name,
+                    ty=NullNode(),
+                    body=cont)
+            return cont
 
         if isinstance(ptn, PtnTupleNode):
             biglam = self.mkPtnLam(ptn.subs[-1], rhs)

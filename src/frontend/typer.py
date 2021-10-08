@@ -425,6 +425,13 @@ class TyperVisitor(ASTVisitor):
         n.type = ty
         return ty, tenv
 
+    def visitPtnLit(self, n):
+        self(n.expr)
+        ty = n.expr.type
+        tenv = {}
+        n.type = ty
+        return ty, tenv
+
     def visitChildren(self, n):
         # pass down _Gamma
         res = []

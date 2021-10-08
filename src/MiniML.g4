@@ -20,7 +20,11 @@ letRecArm
 
 mat
     : lam                                     # mat_
-    | 'match' expr ('|' ptn '->' expr)+ 'end' # mat1
+    | 'match' expr matchArm+ 'end' # mat1
+    ;
+
+matchArm
+    : '|' ptn '->' body=expr
     ;
 
 ptn
@@ -34,6 +38,7 @@ ptn1
 
 ptn0
     : Ident          # ptnBinder
+    | lit            # ptnLit
     | '(' ptn ')'    # ptnParen
     ;
 

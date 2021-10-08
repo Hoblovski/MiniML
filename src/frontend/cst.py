@@ -49,11 +49,13 @@ class ConstructASTVisitor(MiniMLVisitor):
 
     def visitMat1(self, ctx:MiniMLParser.Mat1Context):
         return MatchNode(ctx=ctx,
-                expr=ctx.expr(0).accept(self),
-                arms=[MatchArmNode(ctx=ctx,
-                        ptn=ptn.accept(self),
-                        expr=expr.accept(self))
-                    for ptn, expr in zip(ctx.ptn(), ctx.expr()[1:])])
+                expr=ctx.expr().accept(self),
+                arms=[arm.accept(self) for arm in ctx.matchArm()])
+
+    def visitMatchArm(self, ctx:MiniMLParser.MatchArmContext):
+        return MatchArmNode(ctx=ctx,
+                ptn=ctx.ptn().accept(self),
+                expr=ctx.body.accept(self))
 
     def visitPtnParen(self, ctx:MiniMLParser.PtnParenContext):
         return ctx.ptn().accept(self)
@@ -65,6 +67,10 @@ class ConstructASTVisitor(MiniMLVisitor):
     def visitPtnTuple(self, ctx:MiniMLParser.PtnTupleContext):
         return PtnTupleNode(ctx=ctx,
                 subs=[ptn.accept(self) for ptn in ctx.ptn0()])
+
+    def visitPtnLit(self, ctx:MiniMLParser.PtnLitContext):
+        return PtnLitNode(ctx=ctx,
+                expr=ctx.lit().accept(self))
 
     def visitLam1(self, ctx:MiniMLParser.Lam1Context):
         return LamNode(ctx=ctx,

@@ -88,3 +88,6 @@ class NamerVisitor(ASTVisitor):
 
     def visitPtnTuple(self, n):
         return joinlist([], [self(p) for p in n.subs])
+
+    def visitPtnLit(self, n):
+        return []

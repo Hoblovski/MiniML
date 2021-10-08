@@ -64,7 +64,8 @@ def createNodes(spec):
         classes[className] = nodeClass
     return classes
 
-# TODO TyTup                   : subs+# TODO
+# Null nodes are meant to be placeholders
+#   e.g. for ty field after type checking
 globals().update(createNodes("""
 Null                    :
 
@@ -80,6 +81,7 @@ Match                   : expr arms+
     MatchArm            : ptn expr
         PtnBinder       : name.
         PtnTuple        : subs+
+        PtnLit          : expr
 Lam                     : name.  ty  body
 Seq                     : subs+
 Ite                     : cond  tr  fl
