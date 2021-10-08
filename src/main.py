@@ -6,9 +6,8 @@ from .utils import *
 from .generated.MiniMLLexer import MiniMLLexer
 from .generated.MiniMLParser import MiniMLParser
 from .frontend import *
+from .utils import *
 
-
-_DEBUG_PRINT_AST_BEFORE_UNIFY = False
 
 def printAst(ast):
     if args.format == 'lisp':
@@ -90,7 +89,7 @@ def doNamer(ast):
 
 def doTyper(ast):
     TyperVisitor().visit(ast)
-    if _DEBUG_PRINT_AST_BEFORE_UNIFY:
+    if DEBUG['main.PRINT_AST_BEFORE_UNIFY']:
         print(TypedIndentedPrintVisitor()(ast), file=args.outfile)
     UnifyTagVisitor(ast._constr).visit(ast)
     if args.stage == 'type':

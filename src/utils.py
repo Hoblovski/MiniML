@@ -3,6 +3,7 @@ from antlr4 import *
 from ast import literal_eval
 from pprint import pprint
 
+from .debug import *
 
 class MiniMLError(Exception):
     def __init__(self, *args, **kwargs):

@@ -12,9 +12,6 @@ from ..common import *
 from .ast import *
 from .astnodes import *
 
-_DEBUG_PRINT_CONSTRS = False
-_DEBUG_PRINT_TVMAP = False
-
 class Type:
     def __repr__(self):
         return str(self)
@@ -463,7 +460,7 @@ class UnifyTagVisitor(ASTVisitor):
 
         constrs = _constrs
         while constrs != []:
-            if _DEBUG_PRINT_CONSTRS:
+            if DEBUG['typer.PRINT_CONSTRS']:
                 print('='*70)
                 print('Constrs:')
                 pprint(constrs)
@@ -493,7 +490,7 @@ class UnifyTagVisitor(ASTVisitor):
                 newConstrs += [c]
             constrs = newConstrs
 
-            if _DEBUG_PRINT_CONSTRS:
+            if DEBUG['typer.PRINT_CONSTRS']:
                 print('-'*70)
                 print('Constrs:')
                 pprint(constrs)
@@ -515,7 +512,7 @@ class UnifyTagVisitor(ASTVisitor):
             else:
                 raise MiniMLError('unification failed: no trivial varsubst')
             tvMap[substTvId] = substTy
-            if _DEBUG_PRINT_CONSTRS:
+            if DEBUG['typer.PRINT_CONSTRS']:
                 print('='*70)
                 print(f'{str(substTvId):<30} => {str(substTy):<30}')
             # todo check: panic if    free(substTy).contains(substTvId)
@@ -530,7 +527,7 @@ class UnifyTagVisitor(ASTVisitor):
             if constrs == []:
                 break
 
-        if _DEBUG_PRINT_TVMAP:
+        if DEBUG['typer.PRINT_TVMAP']:
             print(tvMap)
 
         return tvMap
