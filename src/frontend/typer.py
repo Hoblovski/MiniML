@@ -22,9 +22,12 @@ class Type:
     def substMap(self, tvMap):
         raise MiniMLError('unimplemented substMap')
 
-    # Do we need this?
-    def freeTyVars(self):
-        raise MiniMLError('unimplemented freeTyVars')
+    def freeTV(self):
+        """
+        For now we do not have universal types
+        so this function just collects all occurring type variables
+        """
+        raise MiniMLError('unimplemented freeTV')
 
     # PartialEq
     def __eq__(self, other):
@@ -54,7 +57,7 @@ class BaseType(Type):
     def substMap(self, tvMap):
         return self
 
-    def freeTyVars(self):
+    def freeTV(self):
         return []
 
     def unableToUnify(self, other):
@@ -85,8 +88,8 @@ class LamType(Type):
         rhs_ = self.rhs.substMap(tvMap)
         return LamType(lhs_, rhs_)
 
-    def freeTyVars(self):
-        return self.lhs.freeTyVars() + self.rhs.freeTyVars()
+    def freeTV(self):
+        return self.lhs.freeTV() + self.rhs.freeTV()
 
     def unableToUnify(self, other):
         return not (isinstance(other, TypeVar) or self == other)
@@ -118,6 +121,9 @@ class TupleType(Type):
 
     def substMap(self, tvMap):
         return TupleType(*[t.substMap(tvMap) for t in self.subs])
+
+    def freeTV(self):
+        return joinlist([], [t.freeTV() for t in self.subs])
 
     def unableToUnify(self, other):
         return not (isinstance(other, TypeVar) or self == other)
@@ -165,6 +171,9 @@ class TypeVar(Type):
 
     def substMap(self, tvMap):
         return tvMap.get(self.id, self)
+
+    def freeTV(self):
+        return self.id
 
     def unableToUnify(self, other):
         return False
@@ -512,6 +521,9 @@ class UnifyTagVisitor(ASTVisitor):
             else:
                 raise MiniMLError('unification failed: no trivial varsubst')
             tvMap[substTvId] = substTy
+            if substTvId in substTy.freeTV():
+                raise MiniMLError(f'unable to unify possibly recursive type: \'{substTvId} == {substTy}')
+
             if DEBUG['typer.PRINT_CONSTRS']:
                 print('='*70)
                 print(f'{str(substTvId):<30} => {str(substTy):<30}')
