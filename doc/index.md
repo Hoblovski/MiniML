@@ -15,6 +15,10 @@ Borrowed from SLPJ. see PatMat.py.
 # Type checking
 Hindley Milner
 
+The type checker is cleverer than you!
+* Me once written the wrong higher_order.ml and debugged for 2 hours. In the end I found my original annotations were wrong.
+* While trying to type check tup_list.ml, the checker went to a infinite loop -- exactly desired behavior since there was no recursive type support then.
+
 ## Let Polymorphism
 Two ways.
 1. As in TAPL book, associate different type variables with each use.
