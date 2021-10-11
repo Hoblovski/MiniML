@@ -1,7 +1,15 @@
 grammar MiniML;
 
 top
-    : expr EOF
+    : dataType* expr EOF
+    ;
+
+dataType
+    : 'datatype' Ident '=' dataTypeArm* 'end'
+    ;
+
+dataTypeArm
+    : '|' Ident ty*
     ;
 
 expr
@@ -34,6 +42,7 @@ ptn
 ptn1
     : ptn0             # ptn1_
     | ptn0 (',' ptn0)+ # ptnTuple
+    | Ident ptn0+      # ptnData
     ;
 
 ptn0
@@ -100,6 +109,7 @@ ty
     : 'unit'                   # tyUnit
     | 'int'                    # tyInt
     | '(' ty ')'               # tyParen
+    | Ident                    # tyIdent
     | <assoc=right> ty '->' ty # tyArrow
     ;
 
