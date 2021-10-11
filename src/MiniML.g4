@@ -9,7 +9,7 @@ dataType
     ;
 
 dataTypeArm
-    : '|' Ident ty*
+    : '|' Ident ty+     // nullary constructors cause ambiguity
     ;
 
 expr

@@ -96,6 +96,26 @@ Translation scheme:
 
             (OK, nth 1 r_k-1)
     ```
+
+    When p is a adt pattern, simply convert it to the tuple form
+    ```
+        ptn2lam( @ctor p1..pk -> r)
+        =
+        \\x ->
+            if nth 0 x == V_ctor then
+                ptn2lam (@p1..pk -> r) (nth 1 x)
+            else
+                (FAIL, _)
+    ```
+
+    And for the data type definitions, each constructor is transformed into a 'let'
+        ```
+        | ctor a1 a2
+
+        ->
+
+        let ctor = \\a1 -> \\a2 -> (V_ctor, (a1, a2)) in cont
+        ```
 """
 from .ast import *
 from .astnodes import *
@@ -139,6 +159,39 @@ class PatMatVisitor(ASTTransformer):
         suffix = self.nameidx.get(namespace, 0)
         self.nameidx[namespace] = suffix + 1
         return namespace + name + '@' + str(suffix)
+
+    def visitTop(self, n):
+        for dt in n.dataTypes:
+            self(dt)
+        ctorCont = rfold(joinCont, [dt.cont for dt in n.dataTypes], idfun)
+        n.expr = ctorCont(self(n.expr))
+        n.expr = ctorCont(n.expr)
+        return n
+
+    def visitDataType(self, n):
+        for dt in n.ctors:
+            self(dt)
+        ctorCont = rfold(joinCont, [c.cont for c in n.ctors], idfun)
+        n.cont = ctorCont
+        return n
+
+    def visitDataCtor(self, n):
+        # use cps...
+        def letk(cont):
+            params = [self.genName('a') for _ in n.argTys]
+            ctorRepr = TupleNode(subs=[
+                LitNode(val=n.name[1]),
+                TupleNode(subs=[_v(a) for a in params])])
+            for a in reversed(params):
+                ctorRepr = LamNode(name=a, ty=NullNode(), body=ctorRepr)
+            cont = LetNode(
+                    name=n.name[0],
+                    ty=NullNode(),
+                    val=ctorRepr,
+                    body=cont)
+            return cont
+        n.cont = letk
+        return n
 
     def visitMatch(self, n):
         self.visitChildren(n)
@@ -231,6 +284,26 @@ class PatMatVisitor(ASTTransformer):
                     ty=NullNode(),
                     val=biglam,
                     body=cont)
+
+            cont = LamNode(
+                    name=x_name,
+                    ty=NullNode(),
+                    body=cont)
+
+            return cont
+
+        if isinstance(ptn, PtnDataNode):
+            x_name = self.genName('x')
+
+            cont = self.mkPtnLam(PtnTupleNode(subs=ptn.subs), rhs)
+
+            cont = IteNode(
+                    cond=BinOpNode(
+                        lhs=NthNode(idx=0, expr=_v(x_name)),
+                        op='==',
+                        rhs=LitNode(val=ptn.name[1])),
+                    tr=ok(AppNode(fn=cont, arg=NthNode(idx=1, expr=_v(x_name)))),
+                    fl=err())
 
             cont = LamNode(
                     name=x_name,

@@ -20,6 +20,16 @@ def nodeClassFactory(className, nodeName, fieldNames,
         # Python >=3.6 preserves order of kwargs
         if set(kwargs.keys()) != set(fieldNames):
             raise MiniMLError(f'for {className}, fields {fieldNames} expected, given {kwargs.keys()}')
+        # dynamic type checking (we've lots of bugs on AST construction)
+        for fieldName, val in kwargs.items():
+            if fieldName in bunchedFields:
+                if not isinstance(val, list):
+                    raise MiniMLError(f'{className}.{fieldName} expected to be list, got {type(val)}')
+            elif fieldName in termFields:
+                if isinstance(val, ASTNode):
+                    raise MiniMLError(f'{className}.{fieldName} expected to be terminal, got ASTNode: {type(val)}')
+            elif not isinstance(val, ASTNode):
+                raise MiniMLError(f'{className}.{fieldName} expected to be ASTNode, got {type(val)}')
         # Set children (for traversal)
         pos = pos or ctxPos(ctx) or (-1, -1)
         for termf in termFields:
@@ -72,8 +82,12 @@ Null                    :
 TyUnk                   :
 TyBase                  : name.
 TyLam                   : lhs rhs
+TyData                  : name.
 
-Top                     : expr
+Top                     : dataTypes+ expr
+    DataType            : name. ctors+
+        DataCtor            : name. argTys+
+
 Let                     : name.  ty  val  body
 LetRec                  : arms+  body
     LetRecArm           : fnName.  fnTy  argName.  argTy  val
@@ -82,6 +96,7 @@ Match                   : expr arms+
         PtnBinder       : name.
         PtnTuple        : subs+
         PtnLit          : expr
+        PtnData         : name. subs+
 Lam                     : name.  ty  body
 Seq                     : subs+
 Ite                     : cond  tr  fl

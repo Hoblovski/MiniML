@@ -121,17 +121,14 @@ def main(argv):
     try:
         global args
         args = doParseArgs(argv)
-        print('.')
         inputs = FileStream(args.infile)
         tokens = doLex(inputs)
         cst = doParse(tokens)
-        print('.')
         ast = doConstructAST(cst)
         ast = doNamer(ast)
-        ast = doTyper(ast)
+        #ast = doTyper(ast)
         ast = doPatMat(ast)
         ast = doDeBrujin(ast)
-        print('.')
         secd = doSECD(ast)
         return 0
     except MiniMLError as e:

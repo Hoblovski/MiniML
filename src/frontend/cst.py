@@ -27,7 +27,18 @@ class ConstructASTVisitor(MiniMLVisitor):
 
     def visitTop(self, ctx:MiniMLParser.TopContext):
         return TopNode(ctx=ctx,
+                dataTypes=[dt.accept(self) for dt in ctx.dataType()],
                 expr=ctx.expr().accept(self))
+
+    def visitDataType(self, ctx:MiniMLParser.DataTypeContext):
+        return DataTypeNode(ctx=ctx,
+                name=text(ctx.Ident()),
+                ctors=[a.accept(self) for a in ctx.dataTypeArm()])
+
+    def visitDataTypeArm(self, ctx:MiniMLParser.DataTypeArmContext):
+        return DataCtorNode(ctx=ctx,
+                name=text(ctx.Ident()),
+                argTys=[t.accept(self) for t in ctx.ty()])
 
     def visitLet1(self, ctx:MiniMLParser.Let1Context):
         return LetRecNode(ctx=ctx,
@@ -71,6 +82,11 @@ class ConstructASTVisitor(MiniMLVisitor):
     def visitPtnLit(self, ctx:MiniMLParser.PtnLitContext):
         return PtnLitNode(ctx=ctx,
                 expr=ctx.lit().accept(self))
+
+    def visitPtnData(self, ctx:MiniMLParser.PtnDataContext):
+        return PtnDataNode(ctx=ctx,
+                name=text(ctx.Ident()),
+                subs=[ptn.accept(self) for ptn in ctx.ptn0()])
 
     def visitLam1(self, ctx:MiniMLParser.Lam1Context):
         return LamNode(ctx=ctx,
@@ -159,3 +175,6 @@ class ConstructASTVisitor(MiniMLVisitor):
         return TyBaseNode(ctx=ctx,
                 name='unit')
 
+    def visitTyIdent(self, ctx:MiniMLParser.TyIdentContext):
+        return TyDataNode(ctx=ctx,
+                name=text(ctx))

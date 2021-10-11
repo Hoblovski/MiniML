@@ -129,3 +129,17 @@ def joindict(iterable):
         res.update(it)
     return res
 
+def joinCont(cont1, cont2):
+    def cont(k):
+        return cont1(cont2(k))
+    return cont
+
+def idfun(x):
+    return x
+
+def rfold(f, l, a):
+    it = reversed(l)
+    for b in it:
+        a = f(b, a)
+    return a
+

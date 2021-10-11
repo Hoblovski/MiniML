@@ -6,6 +6,12 @@ Alpha conversion to make variables distinct.
 For let-recs, they create 'grouped closures'.
 
 TODO: when introducing type variables they ought to be renamed as well, in a different fashion from TypeVar.genFresh
+
+For data types, it checks for uniqueness of type names and constructor names,
+and that type/constructor names are defined before use.
+It also assigns the integer label for each constructor,
+by making DataCtor.name and PtnData.name a tuple (str, int).
+> This should actually be a class or variant including symbol information.
 """
 from .ast import *
 from .astnodes import *
@@ -28,9 +34,10 @@ class NamerVisitor(ASTVisitor):
         self.nameSuffix[name] = suffix + 1
         return namespace + name + '@' + str(suffix)
 
-    def defVar(self, oldName):
+    def defVar(self, oldName, mangle=True):
         # return: newName after alpha conversion
-        newName = self.genName(oldName)
+        # TODO: should we mangle data ctor by just prefixing them with a namespace
+        newName = self.genName(oldName) if mangle else oldName
         self.vars.append((oldName, newName))
         return newName
 
@@ -45,10 +52,46 @@ class NamerVisitor(ASTVisitor):
                 n.name = newName
                 break
         else:
+            print(self.vars)
             raise MiniMLError(f'unknown name: {n.name}')
+
+    def visitTop(self, n):
+        # check dataTypes, declare dataType ctors
+        #   * ctors are not mangled
+        #   * dataTypes and ctors should be unique
+        #   * types are not mangled
+        #   * types use a different namespace than variables but ctors do not
+        #       since they behave like terms
+        #   * all ident types must be defined
+        self.dataTypes = []
+        self.ctorLabels = {}
+        for dt in n.dataTypes:
+            self(dt)
+
+        # check the expression
+        self(n.expr)
+
+    def visitDataType(self, n):
+        if n.name in self.dataTypes:
+            raise MiniMLLocatedError(n, f'data type {n.name} already defined')
+        self.dataTypes += [n.name]
+        for ctor in n.ctors:
+            self(ctor)
+
+    def visitDataCtor(self, n):
+        if n.name in self.ctorLabels:
+            raise MiniMLLocatedError(n, f'data constructor {n.name} already defined')
+        self.ctorLabels[n.name] = len(self.ctorLabels)
+        self.defVar(n.name, mangle=False)
+        n.name = (n.name, self.ctorLabels[n.name])
+
+    def visitTyData(self, n):
+        if n.name not in self.dataTypes:
+            raise MiniMLLocatedError(n, f'undefined data type {n.name}')
 
     def visitLam(self, n):
         n.name = self.defVar(n.name)
+        self(n.ty)
         self(n.body)
         self.undefVar(n.name)
 
@@ -58,6 +101,8 @@ class NamerVisitor(ASTVisitor):
             raise MiniMLError('duplicate names in let-rec')
 
         for arm in n.arms:
+            self(arm.fnTy)
+            self(arm.argTy)
             arm.fnName = self.defVar(arm.fnName)
 
         for arm in n.arms:
@@ -72,6 +117,7 @@ class NamerVisitor(ASTVisitor):
 
     def visitLet(self, n):
         n.name = self.defVar(n.name)
+        self(n.ty)
         self(n.val)
         self(n.body)
         self.undefVar(n.name)
@@ -87,7 +133,14 @@ class NamerVisitor(ASTVisitor):
         return [n.name]
 
     def visitPtnTuple(self, n):
+        # TODO: duplicate bindings in one pattern?
         return joinlist([], [self(p) for p in n.subs])
 
     def visitPtnLit(self, n):
         return []
+
+    def visitPtnData(self, n):
+        if n.name not in self.ctorLabels:
+            raise MiniMLLocatedError(n, f'undefined data constructor {n.name}')
+        n.name = (n.name, self.ctorLabels[n.name])
+        return joinlist([], [self(p) for p in n.subs])
