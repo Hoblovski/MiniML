@@ -24,8 +24,7 @@ class Type:
 
     def freeTV(self):
         """
-        For now we do not have universal types
-        so this function just collects all occurring type variables
+        a list of free type variables within this type.
         """
         raise MiniMLError('unimplemented freeTV')
 
@@ -173,10 +172,29 @@ class TypeVar(Type):
         return tvMap.get(self.id, self)
 
     def freeTV(self):
-        return self.id
+        return [self.id]
 
     def unableToUnify(self, other):
         return False
+
+class TypeSchema(Type):
+    def __init__(self, ty, tenv):
+        self.ty = ty
+        self.quantifiedTVs = fv(ty) - fv(tenv)
+
+class TypeEnv:
+    def __init__(self, tenv=None):
+        tenv = tenv or {}
+        self.tenv = tenv
+
+    def update(self, varTyBindings):
+        tenv = deepcopy(self.tenv)
+        tenv.update(varTyBindings)
+        return TypeEnv(tenv=tenv)
+
+    def __getitem__(self, key):
+        return self.tenv[key]
+
 
 class MiniMLTypeMismatchError(MiniMLLocatedError):
     def __init__(self, n, expected, actual, msg=None):
@@ -218,12 +236,14 @@ class TyperVisitor(ASTVisitor):
     Type inference & checking. Attaches type info to AST nodes.
 
     Nodes are annotated with fields
-        _tenv (\Gamma)  :: down
+        _tenv (\Gamma)  :: down, of type TypeEnv
         _constr         :: up.
                            type constraints are either
                             (T1, T2):   T1 = T2
                             TODO Richer constraints like `isNotLam T`
         type            :: up
+
+    Visit functions returns nothing. Still visiting patterns return (ty, newBind: tenv)
     """
     VisitorName = 'Typer'
 
@@ -247,9 +267,8 @@ class TyperVisitor(ASTVisitor):
     }
 
     def visitTop(self, n):
-        n._tenv = {}
+        n._tenv = TypeEnv()
         self.visitChildren(n)
-        n._constr = n.expr._constr
 
     def visitTyUnk(self, n):
         n.type = TypeVar.genFresh()
@@ -266,93 +285,74 @@ class TyperVisitor(ASTVisitor):
 
     def visitLet(self, n):
         # TODO: let-polymorphism
-        n.ty._tenv = n._tenv
-        self(n.ty)
-        n.val._tenv = n._tenv
-        self(n.val)
-        n.body._tenv = deepcopy(n._tenv)
-        n.body._tenv[n.name] = n.val.type
-        self(n.body)
-        c1 = TypeConstrEq(n.ty.type, n.val.type)
+        self.goDown(n, n.ty)
+        self.goDown(n, n.val)
+        self.goDown(n, n.body, newBind={ n.name: n.val.type })
         n.type = n.body.type
-        n._constr = n.val._constr + n.body._constr + [c1]
+        n._constr += [TypeConstrEq(n.ty.type, n.val.type)]
 
     def visitLetRec(self, n):
-        constrs = []
-        tenv = deepcopy(n._tenv)
-        armResTys = []
-        # 1. declare all arms before going into their body
+        armDecls = {}
+        armValTys = []
+        # 1. declare all arms before going into their body, but do not go into vals yet
         for arm in n.arms:
-            self(arm.fnTy)
-            self(arm.argTy)
-            armResTy = TypeVar.genFresh()
-            c = TypeConstrEq(arm.fnTy.type, LamType(arm.argTy.type, armResTy))
-            constrs = constrs + [c]
-            tenv[arm.fnName] = arm.fnTy.type
-            armResTys += [armResTy]
+            self.goDown(n, arm.fnTy)
+            self.goDown(n, arm.argTy)
+            armValTy = TypeVar.genFresh()
+            armValTys += [armValTy]
+            n._constr += [TypeConstrEq(arm.fnTy.type, LamType(arm.argTy.type, armValTy))]
+            armDecls[arm.fnName] = arm.fnTy.type
+        tenv = n._tenv.update(armDecls)
         # 2. type the arm bodies
-        for armResTy, arm in zip(armResTys, n.arms):
-            arm.val._tenv = deepcopy(tenv)
-            arm.val._tenv[arm.argName] = arm.argTy.type
-            self(arm.val)
-            c = TypeConstrEq(arm.val.type, armResTy)
-            constrs = constrs + arm.val._constr + [c]
+        for arm, armValTy in zip(n.arms, armValTys):
+            self.goDown(n, arm.val, chTEnv=tenv.update({ arm.argName: arm.argTy.type }))
+            n._constr += [TypeConstrEq(arm.val.type, armValTy)]
         # 3. type the let body
-        n.body._tenv = tenv
-        self(n.body)
-        n._constr = n.body._constr + constrs
+        self.goDown(n, n.body, chTEnv=tenv)
         n.type = n.body.type
 
     def visitLam(self, n):
-        n.ty._tenv = n._tenv
-        self(n.ty)
-        n.body._tenv = deepcopy(n._tenv)
-        n.body._tenv[n.name] = n.ty.type
-        self(n.body)
+        self.goDown(n, n.ty)
+        self.goDown(n, n.body, newBind={ n.name : n.ty.type })
         n.type = LamType(n.ty.type, n.body.type)
-        n._constr = n.body._constr
 
     def visitSeq(self, n):
         self.visitChildren(n)
         n.type = n.subs[-1].type
-        n._constr = joinlist([], [ch._constr for ch in n.subs])
 
     def visitIte(self, n):
         self.visitChildren(n)
         n.type = n.tr.type
-        c1 = TypeConstrEq(n.cond.type, BaseType('bool'))
-        c2 = TypeConstrEq(n.tr.type, n.fl.type)
-        n._constr = n.cond._constr + n.tr._constr + n.fl._constr + [c1, c2]
+        n._constr += [
+                TypeConstrEq(n.cond.type, BaseType('bool')),
+                TypeConstrEq(n.tr.type, n.fl.type)]
 
     def visitBinOp(self, n):
         self.visitChildren(n)
 
         if n.op in {'==', '!='}:
-            n.type = BaseType('bool')
             # TODO: lam types are not compariable
-            c = TypeConstrEq(n.lhs.type, n.rhs.type)
-            n._constr = n.lhs._constr + n.rhs._constr + [c]
+            n.type = BaseType('bool')
+            n._constr += [TypeConstrEq(n.lhs.type, n.rhs.type)]
             return
 
         lhsTy, rhsTy, resTy = TyperVisitor.BinOpRules[n.op]
         n.type = resTy
-        cl = TypeConstrEq(n.lhs.type, lhsTy)
-        cr = TypeConstrEq(n.rhs.type, rhsTy)
-        n._constr = n.lhs._constr + n.rhs._constr + [cl, cr]
+        n._constr += [
+                TypeConstrEq(n.lhs.type, lhsTy),
+                TypeConstrEq(n.rhs.type, rhsTy)]
 
     def visitUnaOp(self, n):
         self.visitChildren(n)
         subTy, resTy = TyperVisitor.UnaOpRules[n.op]
         n.type = resTy
-        c = TypeConstrEq(n.sub.type, subTy)
-        n._constr = n.sub._constr + [c]
+        n._constr += [TypeConstrEq(n.sub.type, subTy)]
 
     def visitApp(self, n):
         self.visitChildren(n)
-        resTV = TypeVar.genFresh()
-        n.type = resTV
-        c = TypeConstrEq(n.fn.type, LamType(n.arg.type, resTV))
-        n._constr = n.fn._constr + n.arg._constr + [c]
+        resTy = TypeVar.genFresh()
+        n.type = resTy
+        n._constr += [TypeConstrEq(n.fn.type, LamType(n.arg.type, resTy))]
 
     def visitLit(self, n):
         if type(n.val) is int:
@@ -361,7 +361,7 @@ class TyperVisitor(ASTVisitor):
         elif n.val == ():
             n.type = BaseType('unit')
             n._constr = []
-        elif type(n.val) == bool: # fuck you python for bool <: int
+        elif type(n.val) is bool: # fuck you python for bool <: int
             n.type = BaseType('bool')
             n._constr = []
         else:
@@ -374,10 +374,9 @@ class TyperVisitor(ASTVisitor):
     def visitTuple(self, n):
         self.visitChildren(n)
         n.type = TupleType(*[sub.type for sub in n.subs])
-        n._constr = joinlist([], [sub._constr for sub in n.subs])
 
     def visitBuiltin(self, n):
-        if n.name == 'println':
+        if n.name == 'println': # println: \forall t. t -> unit
             argTV = TypeVar.genFresh()
             n.type = LamType(argTV, BaseType('unit'))
             n._constr = []
@@ -391,37 +390,35 @@ class TyperVisitor(ASTVisitor):
         #
         #       Theoretically it's possible but let's leave it to dependent typing.
         #       Because essentially  nth  is (variably) dependently typed.
+        #
+        #       Seems like Scala and Rust take the same approach.
         self.visitChildren(n)
         if not isinstance(n.expr.type, TupleType):
-            raise MiniMLLocatedError(n, 'typeck limitation: argument to nth must be of concrete type #TODO')
+            raise MiniMLLocatedError(n,
+                    'typeck limitation: argument to nth must be of concrete tuple type')
         if n.idx >= n.expr.type.arity():
-            raise MiniMLLocatedError(n, f'cannot take {n.idx}-th element of {n.expr.type.arity()}-ary tuple (nth indices start from 0)')
-        n._constr = n.expr._constr
+            raise MiniMLLocatedError(n,
+                    f'cannot take {n.idx}-th element of {n.expr.type.arity()}-ary tuple (nth indices start from 0)')
         n.type = n.expr.type.nth(n.idx)
 
     def visitMatch(self, n):
-        n.expr._tenv = n._tenv
-        self(n.expr)
+        self.goDown(n.expr)
         resTy = TypeVar.genFresh()
         n.type = resTy
-        constrs = n.expr._constr
 
         for arm in n.arms:
-            ty, tenv = self(arm.ptn)
-            arm.expr._tenv = deepcopy(n._tenv)
-            arm.expr._tenv.update(tenv)
-            self(arm.expr)
-            c1 = TypeConstrEq(arm.expr.type, resTy)
-            c2 = TypeConstrEq(ty, n.expr.type)
-            constrs = constrs + arm.expr._constr + [c1, c2]
-
-        n._constr = constrs
+            ty, newBind = self(arm.ptn)
+            self.goDown(n, arm.expr, newBind=newBind)
+            n._constrs += [
+                    TypeConstrEq(arm.expr.type, resTy),
+                    TypeConstrEq(ty, n.expr.type)]
 
     def visitPtnBinder(self, n):
-        # visiting patterns return  ty, tenv
+        # NOTE: visiting patterns returns (ty, newBind)
         ty = TypeVar.genFresh()
         tenv = { n.name: ty }
         n.type = ty
+        n._constr = []
         return ty, tenv
 
     def visitPtnTuple(self, n):
@@ -429,6 +426,7 @@ class TyperVisitor(ASTVisitor):
         tenv = joindict(tenvs)
         ty = TupleType(*tys)
         n.type = ty
+        n._constr = []
         return ty, tenv
 
     def visitPtnLit(self, n):
@@ -436,20 +434,30 @@ class TyperVisitor(ASTVisitor):
         ty = n.expr.type
         tenv = {}
         n.type = ty
+        n._constr = []
         return ty, tenv
 
+
+    def goDown(self, n, ch, newBind=None, chTEnv=None):
+        # just pass down _tenv and collect constr
+        if chTEnv is not None:
+            ch._tenv = chTEnv
+        elif newBind is not None:
+            ch._tenv = n._tenv.update(newBind)
+        else:
+            ch._tenv = n._tenv
+        self(ch)
+        constr, cDelta = getattr(n, '_constr', []), getattr(ch, '_constr', [])
+        n._constr = constr + cDelta
+
     def visitChildren(self, n):
-        # pass down _Gamma
-        res = []
         for f, ch in n._c.items():
             if f in n.bunchedFields:
                 for chch in ch:
-                    chch._tenv = n._tenv
-                    res += [self(chch)]
+                    self.goDown(n, chch)
             else:
-                ch._tenv = n._tenv
-                res += [self(ch)]
-        return res
+                self.goDown(n, ch)
+        return None
 
 
 

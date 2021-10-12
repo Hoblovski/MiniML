@@ -126,7 +126,7 @@ def main(argv):
         cst = doParse(tokens)
         ast = doConstructAST(cst)
         ast = doNamer(ast)
-        #ast = doTyper(ast)
+        ast = doTyper(ast)
         ast = doPatMat(ast)
         ast = doDeBrujin(ast)
         secd = doSECD(ast)
