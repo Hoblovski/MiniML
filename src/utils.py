@@ -72,6 +72,8 @@ def joinlist(sep, iterable):
         joinlist(['s', '/'], [[3], [5, 6], [7, 8]]) =
         [3, 's', '/', 5, 6, 's', '/', 7, 8]
     """
+    if len(iterable) == 0:
+        return []
     res = iterable[0]
     for it in iterable[1:]:
         res += sep

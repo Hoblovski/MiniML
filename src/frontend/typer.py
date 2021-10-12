@@ -1,8 +1,7 @@
 """
 Typer.
 
-Even if we don't have universal types at user level, for type inference we should have them because of constraint based type checking.
-For now it's naive constraint-based type inference, but later it should be some hindley-milner.
+We use a Hindley-Milner style type system.
 
 When python 3.10 comes out this'll be a lot easier with pattern matching.
 """
@@ -178,9 +177,48 @@ class TypeVar(Type):
         return False
 
 class TypeSchema(Type):
-    def __init__(self, ty, tenv):
+    def __init__(self, ty, tenv=None, quantTVIds=None):
         self.ty = ty
-        self.quantifiedTVs = fv(ty) - fv(tenv)
+        assert tenv or quantTVIds is not None
+        if quantTVIds is not None:
+            self.quantTVIds = quantTVIds
+        else:
+            self.quantTVIds = list(set(ty.freeTV()) - set(tenv.freeTV()))
+
+    def subst(self, tvId, ty):
+        if tvId in self.quantTVIds:
+            return self
+        else:
+            return TypeSchema(self.ty.subst(tvId, ty), quantTVIds=self.quantTVIds)
+
+    def substMap(self, tvMap):
+        freeTvMap = { tvId: ty for tvId, ty in tvMap.items() if tvId not in self.quantTVIds }
+        return TypeSchema(self.ty.substMap(freeTV), quantTVIds=quantTVIds)
+
+    def freeTV(self):
+        return list(set(self.ty.freeTV()) - set(self.quantTVIds))
+
+    def __eq__(self, other):
+        """
+        For HM type systems, type schemata only occur in typing contexts. They
+        are instantiated at each use, and thus do not participate in the
+        unification process.
+        """
+        raise MiniMLError('cannot compare TypeSchema')
+
+    def unableToUnify(self, other):
+        """
+        See above. Type schemata do not go into unification.
+        """
+        raise MiniMLError('cannot unify TypeSchema')
+
+    def instantiate(self):
+        tvMap = { qTV: TypeVar.genFresh() for qTV in self.quantTVIds }
+        ty = self.ty.substMap(tvMap)
+        return ty
+
+    def __str__(self):
+        return '\\A<{' '.join(self.quantTVIds)}>. {self.ty}'
 
 class TypeEnv:
     def __init__(self, tenv=None):
@@ -194,6 +232,10 @@ class TypeEnv:
 
     def __getitem__(self, key):
         return self.tenv[key]
+
+    def freeTV(self):
+        return joinlist([], [ty.freeTV() for ty in self.tenv.values()])
+
 
 
 class MiniMLTypeMismatchError(MiniMLLocatedError):
@@ -284,10 +326,9 @@ class TyperVisitor(ASTVisitor):
         n._constr = []
 
     def visitLet(self, n):
-        # TODO: let-polymorphism
         self.goDown(n, n.ty)
         self.goDown(n, n.val)
-        self.goDown(n, n.body, newBind={ n.name: n.val.type })
+        self.goDown(n, n.body, newBind={ n.name: TypeSchema(n.val.type, tenv=n._tenv) })
         n.type = n.body.type
         n._constr += [TypeConstrEq(n.ty.type, n.val.type)]
 
@@ -368,7 +409,10 @@ class TyperVisitor(ASTVisitor):
             unreachable()
 
     def visitVarRef(self, n):
-        n.type = n._tenv[n.name]
+        ty = n._tenv[n.name]
+        if isinstance(ty, TypeSchema):
+            ty = ty.instantiate()
+        n.type = ty
         n._constr = []
 
     def visitTuple(self, n):
