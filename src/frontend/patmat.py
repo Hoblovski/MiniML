@@ -165,7 +165,6 @@ class PatMatVisitor(ASTTransformer):
             self(dt)
         ctorCont = rfold(joinCont, [dt.cont for dt in n.dataTypes], idfun)
         n.expr = ctorCont(self(n.expr))
-        n.expr = ctorCont(n.expr)
         return n
 
     def visitDataType(self, n):
@@ -302,7 +301,7 @@ class PatMatVisitor(ASTTransformer):
                         lhs=NthNode(idx=0, expr=_v(x_name)),
                         op='==',
                         rhs=LitNode(val=ptn.name[1])),
-                    tr=ok(AppNode(fn=cont, arg=NthNode(idx=1, expr=_v(x_name)))),
+                    tr=AppNode(fn=cont, arg=NthNode(idx=1, expr=_v(x_name))),
                     fl=err())
 
             cont = LamNode(
