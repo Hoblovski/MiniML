@@ -11,7 +11,7 @@ LegalBinOps = {
 }
 
 AllBuiltins = {
-        'println',
+        'println', 'print',
 }
 
 LegalBrOps = {

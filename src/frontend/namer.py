@@ -53,7 +53,7 @@ class NamerVisitor(ASTVisitor):
                 break
         else:
             print(self.vars)
-            raise MiniMLError(f'unknown name: {n.name}')
+            raise MiniMLLocatedError(n, f'unknown name: {n.name}')
 
     def visitTop(self, n):
         # check dataTypes, declare dataType ctors
@@ -98,7 +98,7 @@ class NamerVisitor(ASTVisitor):
     def visitLetRec(self, n):
         armNames = [arm.fnName for arm in n.arms]
         if not noDuplicates(armNames):
-            raise MiniMLError('duplicate names in let-rec')
+            raise MiniMLLocatedError(n, 'duplicate names in let-rec')
 
         for arm in n.arms:
             self(arm.fnTy)

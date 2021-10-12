@@ -95,8 +95,13 @@ atom
     | lit                      # atomLit
     | Ident                    # atomIdent
     | '(' expr ')'             # atomParen
-    | 'println'                # atomPrint
+    | builtin                  # atomBuiltin
     | 'nth' Integer atom       # atomNth
+    ;
+
+builtin
+    : 'println'                # BuiltinPrintln
+    | 'print'                  # BuiltinPrint
     ;
 
 lit

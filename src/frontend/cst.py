@@ -142,9 +142,13 @@ class ConstructASTVisitor(MiniMLVisitor):
     def visitTyParen(self, ctx:MiniMLParser.TyParenContext):
         return ctx.ty().accept(self)
 
-    def visitAtomPrint(self, ctx:MiniMLParser.AtomPrintContext):
+    def visitBuiltinPrintln(self, ctx:MiniMLParser.BuiltinPrintlnContext):
         return BuiltinNode(ctx=ctx,
                 name='println')
+
+    def visitBuiltinPrint(self, ctx:MiniMLParser.BuiltinPrintlnContext):
+        return BuiltinNode(ctx=ctx,
+                name='print')
 
     def visitAtomNth(self, ctx:MiniMLParser.AtomNthContext):
         return NthNode(ctx=ctx,

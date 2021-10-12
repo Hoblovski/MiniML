@@ -184,5 +184,12 @@ static inline void builtin_println(void) {
     Ireturn();
 }
 
+static inline void builtin_print(void) {
+    val v = ep_v;
+    printf("%d ", v);
+    _pushs(0);  // placeholder for unit
+    Ireturn();
+}
+
 
 #endif // TEST_H
