@@ -100,8 +100,9 @@ atom
     ;
 
 builtin
-    : 'println'                # BuiltinPrintln
-    | 'print'                  # BuiltinPrint
+    : 'println'
+    | 'print'
+    | 'panic'
     ;
 
 lit

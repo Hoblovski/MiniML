@@ -22,7 +22,7 @@ in
 let foldl1 = \f -> \l ->
     match l
     | Cons a l1 -> foldl f a l1
-    | _ -> panic ()
+    | _ -> () -- panic
     end
 in
 
@@ -30,14 +30,14 @@ let rec foldr1 = \f -> \l ->
     match l
     | Cons a (Nil _) -> a
     | Cons a l1 -> f a (foldr1 f l1)
-    | _ -> panic ()
+    | _ -> () -- panic
     end
 in
 
-let printl_rev = \l -> (foldr (\x -> \y -> print x) l () ; println ())
+let printl_rev = \l -> (foldr (\x -> \y -> print x) l 0 ; println ())
 in
 
-let printl = \l -> (foldl (\x -> \y -> print y) () l ; println ())
+let printl = \l -> (foldl (\x -> \y -> print y) 0 l ; println ())
 in
 
 let rec printl_match = \l ->

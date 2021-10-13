@@ -191,5 +191,9 @@ static inline void builtin_print(void) {
     Ireturn();
 }
 
+static inline void builtin_panic(void) {
+    printf("panicked!\n");
+    exit(1);
+}
 
 #endif // TEST_H

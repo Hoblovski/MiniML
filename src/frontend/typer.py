@@ -92,6 +92,17 @@ class LamType(Type):
     def unableToUnify(self, other):
         return not (isinstance(other, TypeVar) or self == other)
 
+    def flatten(self):
+        """
+        Transform `t1 -> (t2 -> (t3 -> (... tk)))` to `[t1, t2, t3, ... tk]`
+        """
+        ret, t = [], self
+        while isinstance(t, LamType):
+            ret += [t.lhs]
+            t = t.rhs
+        ret += [t]
+        return ret
+
 class TupleType(Type):
     def __init__(self, *subs):
         assert all(isinstance(t, Type) for t in subs)
@@ -214,7 +225,8 @@ class TypeSchema(Type):
         return ty, constrs
 
     def __str__(self):
-        return '\\A<{' '.join(self.quantTVIds)}>. {self.ty}'
+        t = ' '.join(self.quantTVIds)
+        return f'A<{t}>. {self.ty}'
 
 class DataType(Type):
     def __init__(self, name):
@@ -387,6 +399,7 @@ class TyperVisitor(ASTVisitor):
             armValTy = TypeVar.genFresh()
             armValTys += [armValTy]
             n._constr += [TypeConstrEq(arm.fnTy.type, LamType(arm.argTy.type, armValTy))]
+            # TODO: poly let-rec
             armDecls[arm.fnName] = arm.fnTy.type
         tenv = n._tenv.update(armDecls)
         # 2. type the arm bodies
@@ -469,6 +482,14 @@ class TyperVisitor(ASTVisitor):
             argTV = TypeVar.genFresh()
             n.type = LamType(argTV, BaseType('unit'))
             n._constr = []
+        elif n.name == 'print': # print: \forall t. t -> unit
+            # TODO: put them foremost. now we have type schemata.
+            argTV = TypeVar.genFresh()
+            n.type = LamType(argTV, BaseType('unit'))
+            n._constr = []
+        elif n.name == 'panic': # print: \forall t. t
+            n.type = TypeVar.genFresh()
+            n._constr = []
         else:
             unreachable()
 
@@ -491,19 +512,21 @@ class TyperVisitor(ASTVisitor):
         n.type = n.expr.type.nth(n.idx)
 
     def visitMatch(self, n):
-        self.goDown(n.expr)
+        self.goDown(n, n.expr)
         resTy = TypeVar.genFresh()
         n.type = resTy
 
         for arm in n.arms:
-            ty, newBind = self(arm.ptn)
+            ty, newBind = self.goDown(n, arm.ptn)
             self.goDown(n, arm.expr, newBind=newBind)
-            n._constrs += [
+            n._constr += [
                     TypeConstrEq(arm.expr.type, resTy),
                     TypeConstrEq(ty, n.expr.type)]
 
     def visitPtnBinder(self, n):
         # NOTE: visiting patterns returns (ty, newBind)
+        #   ty: what type does the pattern match against
+        #   newBind: { name: ty }, binders introduced by the pattern into its body
         ty = TypeVar.genFresh()
         tenv = { n.name: ty }
         n.type = ty
@@ -511,7 +534,7 @@ class TyperVisitor(ASTVisitor):
         return ty, tenv
 
     def visitPtnTuple(self, n):
-        tys, tenvs = list(unzip(self(s) for s in n.subs))
+        tys, tenvs = list(unzip(self.goDown(n, s) for s in n.subs))
         tenv = joindict(tenvs)
         ty = TupleType(*tys)
         n.type = ty
@@ -519,13 +542,23 @@ class TyperVisitor(ASTVisitor):
         return ty, tenv
 
     def visitPtnLit(self, n):
-        self(n.expr)
+        self.goDown(n, n.expr)
         ty = n.expr.type
         tenv = {}
         n.type = ty
         n._constr = []
         return ty, tenv
 
+    def visitPtnData(self, n):
+        tys, tenvs = list(unzip(self.goDown(n, s) for s in n.subs))
+        tenv = joindict(tenvs)
+        # the provided (ptn) argument tys and ctor param tys agree
+        ctorTys = asinstance(n._tenv[n.name[0]], LamType).flatten()
+        constrs = [TypeConstrEq(argTy, ctorParamTy)
+                for argTy, ctorParamTy in zip(tys, ctorTys)]
+        n.type = ctorTys[-1]
+        n._constr = constrs
+        return n.type, tenv
 
     def goDown(self, n, ch, newBind=None, chTEnv=None):
         # just pass down _tenv and collect constr
