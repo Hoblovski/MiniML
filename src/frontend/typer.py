@@ -390,6 +390,9 @@ class TyperVisitor(ASTVisitor):
         n._constr += [TypeConstrEq(n.ty.type, n.val.type)]
 
     def visitLetRec(self, n):
+        # Polymorphic let-recs require some careful thought.
+        #   ... written lots of stuff and deleted
+        #   within let-rec arms, all arms are monotype, but in body they are polytype
         armDecls = {}
         armValTys = []
         # 1. declare all arms before going into their body, but do not go into vals yet
@@ -399,13 +402,15 @@ class TyperVisitor(ASTVisitor):
             armValTy = TypeVar.genFresh()
             armValTys += [armValTy]
             n._constr += [TypeConstrEq(arm.fnTy.type, LamType(arm.argTy.type, armValTy))]
-            # TODO: poly let-rec
             armDecls[arm.fnName] = arm.fnTy.type
         tenv = n._tenv.update(armDecls)
         # 2. type the arm bodies
         for arm, armValTy in zip(n.arms, armValTys):
             self.goDown(n, arm.val, chTEnv=tenv.update({ arm.argName: arm.argTy.type }))
             n._constr += [TypeConstrEq(arm.val.type, armValTy)]
+        tenv = { arm.fnName:
+                TypeSchema(LamType(arm.argTy.type, arm.val.type), tenv=n._tenv, constrs=arm.val._constr + arm.argTy._constr)
+                for arm in n.arms }
         # 3. type the let body
         self.goDown(n, n.body, chTEnv=tenv)
         n.type = n.body.type
@@ -683,6 +688,16 @@ class UnifyTagVisitor(ASTVisitor):
         if hasattr(n, 'type'):
             n.type = n.type.substMap(self.tvMap)
         ASTVisitor.visit(self, n)
+        if DEBUG['typer.PRINT_VARTY_AFTER_UNIFICATION']:
+            if isinstance(n, LetNode):
+                v, t = n.name, str(n.ty.type)
+                print(f'let     {v:<20}{t:<40}')
+            elif isinstance(n, LamNode):
+                v, t = n.name, str(n.ty.type)
+                print(f'lam     {v:<20}{t:<40}')
+            elif isinstance(n, LetRecArmNode):
+                v, t = n.fnName, str(n.fnTy.type)
+                print(f'lrarm   {v:<20}{t:<40}')
 
 
 class TypedIndentedPrintVisitor(ASTVisitor):

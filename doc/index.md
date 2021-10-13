@@ -22,8 +22,11 @@ The type checker is cleverer than you!
 ## Let Polymorphism
 Two ways.
 1. As in TAPL book, associate different type variables with each use.
-  - This is essentially universal types.
+  - This is essentially restricted universal types.
 2. So called type schemes as in [cs3110](https://www.cs.cornell.edu/courses/cs3110/2020fa/textbook/interp/letpoly.html)
+  - Oh I just realized in essence they are the same thing.
+
+But polymorphic let-recs require careful thought on bound variables.
 
 
 ## Typeclasses

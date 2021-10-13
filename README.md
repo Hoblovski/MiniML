@@ -79,3 +79,5 @@ De brujin form is very unstable. Even if necessary, delay the conversion into it
 * [SoPL](https://xavierleroy.org/talks/compilation-agay.pdf)
 * Various compiler books (too many to name)
 * [scala phases](https://typelevel.org/scala/docs/phases.html)
+* [hindley-milner introduction](https://reasonableapproximation.net/2019/05/05/hindley-milner.html)
+  - for its treatment of `let rec`, still it's not polyvariadic `let rec`
