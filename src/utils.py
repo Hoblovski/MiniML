@@ -115,6 +115,9 @@ def noDuplicates(l):
 def unreachable():
     raise Exception('unreachable')
 
+def unimplemented():
+    raise Exception('unimplemented')
+
 def unionsets(l):
     r = set()
     for s in l:
@@ -126,8 +129,8 @@ def unzip(iterable):
     return zip(*iterable)
 
 def joindict(iterable):
-    res = deepcopy(iterable[0])
-    for it in iterable[1:]:
+    res = {}
+    for it in iterable:
         res.update(it)
     return res
 

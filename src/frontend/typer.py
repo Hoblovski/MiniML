@@ -177,8 +177,15 @@ class TypeVar(Type):
         return False
 
 class TypeSchema(Type):
-    def __init__(self, ty, tenv=None, quantTVIds=None):
+    """
+    For HM type systems, type schemata only occur in typing contexts. They
+    are instantiated at each use, and thus do not participate in the
+    unification process. So all methods only used in unification are unimplemented.
+    """
+    def __init__(self, ty, tenv=None, quantTVIds=None, constrs=None):
+        constrs = constrs or []
         self.ty = ty
+        self.constrs = constrs
         assert tenv or quantTVIds is not None
         if quantTVIds is not None:
             self.quantTVIds = quantTVIds
@@ -186,39 +193,53 @@ class TypeSchema(Type):
             self.quantTVIds = list(set(ty.freeTV()) - set(tenv.freeTV()))
 
     def subst(self, tvId, ty):
-        if tvId in self.quantTVIds:
-            return self
-        else:
-            return TypeSchema(self.ty.subst(tvId, ty), quantTVIds=self.quantTVIds)
+        unimplemented()
 
     def substMap(self, tvMap):
-        freeTvMap = { tvId: ty for tvId, ty in tvMap.items() if tvId not in self.quantTVIds }
-        return TypeSchema(self.ty.substMap(freeTV), quantTVIds=quantTVIds)
+        unimplemented()
 
     def freeTV(self):
         return list(set(self.ty.freeTV()) - set(self.quantTVIds))
 
     def __eq__(self, other):
-        """
-        For HM type systems, type schemata only occur in typing contexts. They
-        are instantiated at each use, and thus do not participate in the
-        unification process.
-        """
-        raise MiniMLError('cannot compare TypeSchema')
+        unimplemented()
 
     def unableToUnify(self, other):
-        """
-        See above. Type schemata do not go into unification.
-        """
-        raise MiniMLError('cannot unify TypeSchema')
+        unimplemented()
 
     def instantiate(self):
         tvMap = { qTV: TypeVar.genFresh() for qTV in self.quantTVIds }
         ty = self.ty.substMap(tvMap)
-        return ty
+        constrs = [c.substMap(tvMap) for c in self.constrs]
+        return ty, constrs
 
     def __str__(self):
         return '\\A<{' '.join(self.quantTVIds)}>. {self.ty}'
+
+class DataType(Type):
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return f'dataType<{self.name}>'
+
+    def __eq__(self, other):
+        return isinstance(other, DataType) and self.name == other.name
+
+    def __hash__(self):
+        return hash(self.name)
+
+    def subst(self, tvId, ty):
+        return self
+
+    def substMap(self, tvMap):
+        return self
+
+    def freeTV(self):
+        return []
+
+    def unableToUnify(self, other):
+        return not (isinstance(other, TypeVar) or self == other)
 
 class TypeEnv:
     def __init__(self, tenv=None):
@@ -254,7 +275,13 @@ class TypeConstr:
         """
         Is this Constr always True? i.e. Useless tautology?
         """
-        raise MiniMLError('unimplemented isValid')
+        unimplemented()
+
+    def subst(self, tvId, ty):
+        unimplemented()
+
+    def substMap(self, tvMap):
+        unimplemented()
 
 class TypeConstrEq(TypeConstr):
     def __init__(self, lhs, rhs):
@@ -272,6 +299,9 @@ class TypeConstrEq(TypeConstr):
 
     def subst(self, tvId, ty):
         return TypeConstrEq(self.lhs.subst(tvId, ty), self.rhs.subst(tvId, ty))
+
+    def substMap(self, tvMap):
+        return TypeConstrEq(self.lhs.substMap(tvMap), self.rhs.substMap(tvMap))
 
 class TyperVisitor(ASTVisitor):
     """
@@ -310,7 +340,8 @@ class TyperVisitor(ASTVisitor):
 
     def visitTop(self, n):
         n._tenv = TypeEnv()
-        self.visitChildren(n)
+        newBind = joindict([self.goDown(n, dt) for dt in n.dataTypes])
+        self.goDown(n, n.expr, newBind=newBind)
 
     def visitTyUnk(self, n):
         n.type = TypeVar.genFresh()
@@ -325,10 +356,24 @@ class TyperVisitor(ASTVisitor):
         n.type = LamType(n.lhs.type, n.rhs.type)
         n._constr = []
 
+    def visitTyData(self, n):
+        n.type = DataType(n.name)
+        n._constr = []
+
+    def visitDataType(self, n):
+        newBind = {}
+        for ctor in n.ctors:
+            ctorTy = DataType(n.name)
+            for ty in reversed(ctor.argTys):
+                self.goDown(n, ty)
+                ctorTy = LamType(ty.type, ctorTy)
+            newBind[ctor.name[0]] = ctorTy
+        return newBind
+
     def visitLet(self, n):
         self.goDown(n, n.ty)
         self.goDown(n, n.val)
-        self.goDown(n, n.body, newBind={ n.name: TypeSchema(n.val.type, tenv=n._tenv) })
+        self.goDown(n, n.body, newBind={ n.name: TypeSchema(n.val.type, tenv=n._tenv, constrs=n.val._constr) })
         n.type = n.body.type
         n._constr += [TypeConstrEq(n.ty.type, n.val.type)]
 
@@ -409,11 +454,11 @@ class TyperVisitor(ASTVisitor):
             unreachable()
 
     def visitVarRef(self, n):
-        ty = n._tenv[n.name]
+        ty, constr = n._tenv[n.name], []
         if isinstance(ty, TypeSchema):
-            ty = ty.instantiate()
+            ty, constr = ty.instantiate()
         n.type = ty
-        n._constr = []
+        n._constr = constr
 
     def visitTuple(self, n):
         self.visitChildren(n)
@@ -490,18 +535,20 @@ class TyperVisitor(ASTVisitor):
             ch._tenv = n._tenv.update(newBind)
         else:
             ch._tenv = n._tenv
-        self(ch)
+        ret = self(ch)
         constr, cDelta = getattr(n, '_constr', []), getattr(ch, '_constr', [])
         n._constr = constr + cDelta
+        return ret
 
     def visitChildren(self, n):
+        ret = []
         for f, ch in n._c.items():
             if f in n.bunchedFields:
                 for chch in ch:
-                    self.goDown(n, chch)
+                    ret += [self.goDown(n, chch)]
             else:
-                self.goDown(n, ch)
-        return None
+                ret += [self.goDown(n, ch)]
+        return ret
 
 
 
