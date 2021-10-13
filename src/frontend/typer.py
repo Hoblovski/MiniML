@@ -195,13 +195,16 @@ class TypeSchema(Type):
     """
     def __init__(self, ty, tenv=None, quantTVIds=None, constrs=None):
         constrs = constrs or []
+
         self.ty = ty
         self.constrs = constrs
         assert tenv or quantTVIds is not None
         if quantTVIds is not None:
             self.quantTVIds = quantTVIds
         else:
-            self.quantTVIds = list(set(ty.freeTV()) - set(tenv.freeTV()))
+            # NOTE: generalization requires constraints to be generalized as well
+            constrFreeTV = joinlist([], [c.freeTV() for c in self.constrs])
+            self.quantTVIds = list(set(ty.freeTV() + constrFreeTV) - set(tenv.freeTV()))
 
     def subst(self, tvId, ty):
         unimplemented()
@@ -295,6 +298,9 @@ class TypeConstr:
     def substMap(self, tvMap):
         unimplemented()
 
+    def freeTV(self):
+        unimplemented()
+
 class TypeConstrEq(TypeConstr):
     def __init__(self, lhs, rhs):
         self.lhs = lhs
@@ -314,6 +320,9 @@ class TypeConstrEq(TypeConstr):
 
     def substMap(self, tvMap):
         return TypeConstrEq(self.lhs.substMap(tvMap), self.rhs.substMap(tvMap))
+
+    def freeTV(self):
+        return self.lhs.freeTV() + self.rhs.freeTV()
 
 class TyperVisitor(ASTVisitor):
     """
@@ -403,16 +412,18 @@ class TyperVisitor(ASTVisitor):
             armValTys += [armValTy]
             n._constr += [TypeConstrEq(arm.fnTy.type, LamType(arm.argTy.type, armValTy))]
             armDecls[arm.fnName] = arm.fnTy.type
-        tenv = n._tenv.update(armDecls)
         # 2. type the arm bodies
+        tenv = n._tenv.update(armDecls)
         for arm, armValTy in zip(n.arms, armValTys):
             self.goDown(n, arm.val, chTEnv=tenv.update({ arm.argName: arm.argTy.type }))
             n._constr += [TypeConstrEq(arm.val.type, armValTy)]
-        tenv = { arm.fnName:
-                TypeSchema(LamType(arm.argTy.type, arm.val.type), tenv=n._tenv, constrs=arm.val._constr + arm.argTy._constr)
-                for arm in n.arms }
         # 3. type the let body
-        self.goDown(n, n.body, chTEnv=tenv)
+        polyArmBinds = { arm.fnName:
+                TypeSchema(LamType(arm.argTy.type, arm.val.type),
+                    tenv=n._tenv,
+                    constrs=arm.val._constr + arm.argTy._constr)
+                for arm in n.arms }
+        self.goDown(n, n.body, chTEnv=tenv.update(polyArmBinds))
         n.type = n.body.type
 
     def visitLam(self, n):
@@ -568,7 +579,7 @@ class TyperVisitor(ASTVisitor):
     def goDown(self, n, ch, newBind=None, chTEnv=None):
         # just pass down _tenv and collect constr
         if chTEnv is not None:
-            ch._tenv = chTEnv
+            ch._tenv = asinstance(chTEnv, TypeEnv)
         elif newBind is not None:
             ch._tenv = n._tenv.update(newBind)
         else:
@@ -605,12 +616,17 @@ class UnifyTagVisitor(ASTVisitor):
         tvMap = {}
 
         constrs = _constrs
+        niter = 0
         while constrs != []:
             if DEBUG['typer.PRINT_CONSTRS']:
                 print('='*70)
                 print('Constrs:')
                 pprint(constrs)
                 print(':Constrs')
+
+            if DEBUG['typer.PRINT_UNIF_STATS']:
+                niter += 1
+                print(f'unification iter {niter}')
             newConstrs = []
 
             # 1. break lambdas, tuples etc.

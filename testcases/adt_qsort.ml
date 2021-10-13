@@ -86,7 +86,7 @@ let rec makel = \n ->
         let l = makel (n-1) in
         match l
         | Cons v _ -> Cons (randf v) l
-        | _ -> () -- unreachable
+        | _ -> panic ()
         end
     )
 in
