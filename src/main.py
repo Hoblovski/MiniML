@@ -31,6 +31,7 @@ def doParseArgs(argv):
             help='AST print format')
     parser.add_argument(
             '-s', '--stage', type=str, choices={'cst', 'lex', 'ast', 'name', 'secd', 'c', 'patmat', 'debrujin', 'type'},
+            default='secd',
             help='[Debug] print debug info for that stage')
     parser.add_argument(
             '-bt', '--backtrace', action='store_true',
