@@ -116,9 +116,9 @@ class NamerVisitor(ASTVisitor):
             self.undefVar(arm.fnName)
 
     def visitLet(self, n):
-        n.name = self.defVar(n.name)
         self(n.ty)
         self(n.val)
+        n.name = self.defVar(n.name)
         self(n.body)
         self.undefVar(n.name)
 
