@@ -1,5 +1,20 @@
 # MiniML
-Functional language compiler for fun.
+ML-like functional language compiler written in Python for fun.
+
+You may be interested in my [rewrite of miniml in Rust](https://github.com/Hoblovski/miniml-rs).
+
+# Features
+* Function as first-class citizen, higher order functions
+* Compile (or transpile) to native. Uses C as backend.
+* Associated IR interpreter, [RSECD](https://github.com/Hoblovski/RSECD-interp)
+* Polymorphic type checking.
+* Pattern matching (as powerful as in ML).
+* [TODO] garbage collection
+* [TODO] polymorphic types
+* [TODO] optimizations
+  - [Tail recursive SECD](https://www.cs.utexas.edu/users/boyer/ftp/nqthm/trsecd/trsecd.html)
+  - CPS
+  - Even G machine maybe?
 
 # Usage
 Requires:
@@ -29,9 +44,9 @@ cd path/to/RSECD-interp                                         # see [RSECD] be
 ./secdi path/to/output.secd
 
 # Compile to native. Should be orders of magnitudes (>100x) faster than intrepreting.
-./miniml -s c testcases/higherorder.ml higherorder.c
-gcc -m32 -Isrc higherorder.c
-./a.out                                                         # same result as interpreter
+export PATH=$PATH:$PWD
+./minimlc testcases/higherorder.ml
+./a.out                                                         # same results as interpreting
 ```
 
 If you see `ModuleNotFoundError: No module named 'src.generated'`, run `make grammar-py` and then rerun your command.
@@ -41,29 +56,21 @@ If you see `ModuleNotFoundError: No module named 'src.generated'`, run `make gra
 * lexing parsing desugaring stuff with ANTLR
 * naming: just alpha conversion pass, make all names distinct.
   - So we can use a flat dict for book-keeping.
-* [TODO] typing
-* [TODO] patmat (once done wrong in the past)
+  - maybe we should not mutate the ast... that can make bug report harder?
+* typing
+  - supports polymorphism e.g. `'a -> 'a` and polymorphic-let
+  - hindley-milner style type checking
+* patmat (once done wrong in the past)
 * debrujin: convert to the nameless de brujin form for SECD emission
 * [RSECD](https://github.com/Hoblovski/RSECD-interp): stack based functional IR
   - SECD with mutually recursive functions.
 * C transpiler: the generated C looks really like an interpreter script, but trust me it'll be compiled.
-
-# Features
-* Function as first-class citizen, higher ordered functions
-* Compile (or transpile) to native. Uses C as backend.
-* Associated IR interpreter, [RSECD](https://github.com/Hoblovski/RSECD-interp)
-* [TODO] custom data types
-* [TODO] garbage collection
-* [TODO] pattern matching
-* [TODO] polymorphic types
-* [TODO] optimizations
-  - [Tail recursive SECD](https://www.cs.utexas.edu/users/boyer/ftp/nqthm/trsecd/trsecd.html)
-  - CPS
-  - Even G machine maybe?
+  - and it's fast
 
 # Lessons
 Type system is good for correctness, but only a static one (not you python!).
 But dynamic languages saves me a lot of code (see `ast.py` and `astnodes.py` for how I avoid AST boilerplates).
+> now I got my rs-miniml, this might not be true since a macro system is (probably good) for DSL.
 
 The interpreter is so slow... Maybe somewhere in python a careless list operation is taking O(n^2) time?
 
@@ -72,8 +79,11 @@ This is why we put patmat after namer/typer even though it could be before as a 
 
 De brujin form is very unstable. Even if necessary, delay the conversion into it.
 
+Python is slow. For `adt_qsort.ml`, miniml took ~1sec while rsminiml tool <0.01sec.
+
 # Reference
 * [RSECD](https://github.com/Hoblovski/RSECD-interp)
+* [miniml-rs](https://github.com/Hoblovski/miniml-rs).
 * [CompFun](http://www.cse.chalmers.se/edu/year/2011/course/CompFun/)
 * [CAS706](https://www.cas.mcmaster.ca/~carette/CAS706/2005/Compiling%20Functional%20Programming%20Languages.pdf)
 * [SoPL](https://xavierleroy.org/talks/compilation-agay.pdf)

@@ -1,0 +1,20 @@
+#!/bin/bash
+if ! command -v miniml >/dev/null; then
+	echo 'miniml not found in $PATH'
+	exit 1
+fi
+
+if [[ $# == 1 ]]; then
+	set -- "$1" a.out
+fi
+if [[ $# != 2 ]]; then
+	echo "usage: minimlc INPUT [OUTPUT]"
+	exit 1
+fi
+
+SCRIPT=$(realpath "$0")
+SCRIPTPATH=$(dirname "$SCRIPT")
+set -e
+miniml -s c $1 $2.c
+gcc -m32 -I$SCRIPTPATH/src $2.c -o $2
+echo -e "Output is at $2\nArtifact C is $2.c"
